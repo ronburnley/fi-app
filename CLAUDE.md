@@ -82,23 +82,29 @@ interface UserProfile {
   lifeExpectancy: number; // default 95
   state: string; // for future tax context
   filingStatus: 'single' | 'married';
+  spouseAge?: number; // when married
 }
 ```
 
-### Assets
+### Assets (v3 - Array-based)
 ```typescript
+type AccountType = 'taxable' | 'traditional' | 'roth' | 'hsa' | 'cash';
+type AccountOwner = 'self' | 'spouse' | 'joint';
+
+interface Asset {
+  id: string;                    // UUID
+  name: string;                  // "Ron's Fidelity 401k"
+  type: AccountType;             // Tax treatment
+  owner: AccountOwner;           // Who owns it (affects 59.5 timing)
+  balance: number;
+  costBasis?: number;            // Taxable accounts only
+  is401k?: boolean;              // For Rule of 55 eligibility
+  separatedFromService?: boolean; // Rule of 55: left employer at 55+
+}
+
 interface Assets {
-  taxableBrokerage: {
-    balance: number;
-    costBasis: number; // for cap gains calculation
-  };
-  traditional401k: number;
-  traditionalIRA: number;
-  roth401k: number;
-  rothIRA: number;
-  hsa: number;
-  cash: number;
-  homeEquity?: number; // optional, display only
+  accounts: Asset[];             // Array of all accounts
+  homeEquity?: number;           // Display only, not in withdrawals
   pension?: {
     annualBenefit: number;
     startAge: number;
@@ -108,10 +114,18 @@ interface Assets {
 
 ### SocialSecurity
 ```typescript
+interface SpouseSocialSecurity {
+  include: boolean;
+  monthlyBenefit: number;
+  startAge: 62 | 67 | 70;
+}
+
 interface SocialSecurity {
   include: boolean;
   monthlyBenefit: number;
   startAge: 62 | 67 | 70;
+  colaRate: number; // default 0.02 (2% annual increase)
+  spouse?: SpouseSocialSecurity;
 }
 ```
 
@@ -119,7 +133,6 @@ interface SocialSecurity {
 ```typescript
 interface Expenses {
   annualSpending: number;
-  // Future: could break into categories
 }
 ```
 
@@ -129,20 +142,27 @@ interface LifeEvent {
   id: string;
   name: string;
   year: number;
-  amount: number; // positive = expense, negative = income (inheritance, etc.)
+  amount: number; // positive = expense, negative = income
 }
 ```
 
 ### Assumptions
 ```typescript
+interface PenaltySettings {
+  earlyWithdrawalPenaltyRate: number;  // default 0.10 (10%)
+  hsaEarlyPenaltyRate: number;         // default 0.20 (20%)
+  enableRule55: boolean;                // default false
+}
+
 interface Assumptions {
   investmentReturn: number; // default 0.06
   inflationRate: number; // default 0.03
   traditionalTaxRate: number; // default 0.22
   capitalGainsTaxRate: number; // default 0.15
   rothTaxRate: number; // always 0
-  withdrawalOrder: ('taxable' | 'traditional' | 'roth')[]; // default order
+  withdrawalOrder: ('taxable' | 'traditional' | 'roth')[];
   safeWithdrawalRate: number; // default 0.04
+  penaltySettings: PenaltySettings;
 }
 ```
 
@@ -174,7 +194,8 @@ For each year from `currentAge` to `lifeExpectancy`:
 2. **Add life events** for this year
 
 3. **Calculate income**
-   - Social Security (if age >= startAge)
+   - Social Security with COLA (if age >= startAge)
+   - Spouse Social Security with COLA (if spouse age >= startAge)
    - Pension (if age >= startAge)
 
 4. **Calculate gap**
@@ -182,10 +203,14 @@ For each year from `currentAge` to `lifeExpectancy`:
    gap = yearExpenses - income
    ```
 
-5. **Withdraw from accounts** (in order specified)
+5. **Withdraw from accounts** (in order specified, with penalty logic)
+   - Cash: No tax, no penalty
    - Taxable: Apply capital gains tax on gains portion
-   - Traditional: Apply income tax rate
-   - Roth: No tax
+   - Traditional: Apply income tax rate + 10% penalty if owner < 59.5
+   - Roth: No tax + 10% penalty if owner < 59.5
+   - HSA: Tax-free for medical, 20% penalty if owner < 65
+   - Rule of 55: 401(k) accounts exempt if separated from service at 55+
+   - Priority: Penalty-free accounts first within each type
 
 6. **Grow remaining balances**
    ```
@@ -193,6 +218,21 @@ For each year from `currentAge` to `lifeExpectancy`:
    ```
 
 7. **Record year's data point**
+
+### Penalty Rules
+
+| Account Type | Penalty-Free Age | Penalty Rate | Notes |
+|--------------|------------------|--------------|-------|
+| Taxable | Any | 0% | Never penalized |
+| Cash | Any | 0% | Never penalized |
+| Traditional | 59.5 | 10% | Rule of 55 for 401k |
+| Roth | 59.5 | 10% | On earnings only |
+| HSA | 65 | 20% | For non-medical |
+
+### Owner Age Logic
+- `self` → uses `profile.currentAge`
+- `spouse` → uses `profile.spouseAge`
+- `joint` → uses older of the two (conservative)
 
 ### Output Structure
 ```typescript
@@ -203,10 +243,13 @@ interface YearProjection {
   income: number; // SS + pension
   gap: number;
   withdrawal: number;
+  withdrawalPenalty: number;
   withdrawalSource: string;
   taxableBalance: number;
   traditionalBalance: number;
   rothBalance: number;
+  hsaBalance: number;
+  cashBalance: number;
   totalNetWorth: number;
   isShortfall: boolean;
 }
@@ -216,84 +259,70 @@ interface YearProjection {
 
 ## UI Structure
 
-### Layout
+### Layout (Wizard Flow)
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Logo                                    [Export] [Import]  │
+│  Logo                                    [Import] [Export]  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  ┌─────────────────┐  ┌──────────────────────────────────┐  │
-│  │                 │  │                                  │  │
-│  │  Input Panel    │  │  Results Panel                   │  │
-│  │  (Scrollable)   │  │                                  │  │
-│  │                 │  │  ┌────────────────────────────┐  │  │
-│  │  - Profile      │  │  │  Summary Metrics           │  │  │
-│  │  - Assets       │  │  └────────────────────────────┘  │  │
-│  │  - Expenses     │  │                                  │  │
-│  │  - Social Sec   │  │  ┌────────────────────────────┐  │  │
-│  │  - Life Events  │  │  │  Chart View                │  │  │
-│  │  - Assumptions  │  │  │  (Stacked Area)            │  │  │
-│  │                 │  │  └────────────────────────────┘  │  │
-│  │  ───────────────│  │                                  │  │
-│  │  What-If Panel  │  │  ┌────────────────────────────┐  │  │
-│  │  (Sliders)      │  │  │  Table View                │  │  │
-│  │                 │  │  │  (Year-by-year)            │  │  │
-│  └─────────────────┘  │  └────────────────────────────┘  │  │
-│                       └──────────────────────────────────┘  │
+│              ●───●───○───○───○───○───○                      │
+│              1   2   3   4   5   6   7                      │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                                                     │   │
+│  │              Step Title                             │   │
+│  │              Step description text                  │   │
+│  │                                                     │   │
+│  │  ┌───────────────────────────────────────────────┐ │   │
+│  │  │                                               │ │   │
+│  │  │           Step Content                        │ │   │
+│  │  │           (Form inputs, tables, etc.)         │ │   │
+│  │  │                                               │ │   │
+│  │  └───────────────────────────────────────────────┘ │   │
+│  │                                                     │   │
+│  │           [Back]              [Continue]            │   │
+│  │                                                     │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Input Panel Sections
+### Wizard Steps
 
-**Profile**
-- Current age (number input)
-- Target FI age (number input)
-- Life expectancy (number input, default 95)
-- Filing status (toggle: Single / Married)
+1. **Welcome** - Profile basics (ages, filing status)
+2. **Assets** - Table-based asset entry with add/edit/delete
+3. **Spending** - Annual expenses
+4. **Benefits** - Social Security (self + spouse), pension
+5. **Life Events** - Table-based one-time income/expenses
+6. **Assumptions** - Returns, inflation, taxes, penalties (optional)
+7. **Results** - Summary, chart, table, what-if sliders
 
-**Assets**
-- Taxable brokerage (currency input)
-  - Cost basis (currency input, collapsible)
-- Traditional 401k/IRA (currency input)
-- Roth 401k/IRA (currency input)
-- HSA (currency input)
-- Cash (currency input)
-- Pension toggle
-  - Annual benefit (currency input)
-  - Start age (number input)
+### Assets Table
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Name              │ Type        │ Owner  │ Balance   │ Actions│
+├───────────────────┼─────────────┼────────┼───────────┼────────┤
+│ Fidelity 401k     │ Traditional │ Self   │ $800,000  │ ✏️ 🗑️  │
+│ Vanguard Taxable  │ Taxable     │ Joint  │ $500,000  │ ✏️ 🗑️  │
+│ Spouse Roth IRA   │ Roth        │ Spouse │ $200,000  │ ✏️ 🗑️  │
+├───────────────────┴─────────────┴────────┴───────────┴────────┤
+│ Total: $1,500,000                              [+ Add Asset]  │
+└───────────────────────────────────────────────────────────────┘
+```
 
-**Expenses**
-- Annual spending in retirement (currency input)
+### Life Events Table
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Event             │ Year │ Amount                  │ Actions │
+├───────────────────┼──────┼─────────────────────────┼─────────┤
+│ Home renovation   │ 2028 │ -$50,000 (expense)      │ ✏️ 🗑️   │
+│ Inheritance       │ 2035 │ +$100,000 (income)      │ ✏️ 🗑️   │
+├───────────────────┴──────┴─────────────────────────┴─────────┤
+│                                          [+ Add Life Event]  │
+└──────────────────────────────────────────────────────────────┘
+```
 
-**Social Security**
-- Include toggle (yes/no)
-- Monthly benefit (currency input)
-- Start age (select: 62 / 67 / 70)
-
-**Life Events**
-- List of events with add/remove
-- Each: Name, Year, Amount
-
-**Assumptions** (collapsible, show defaults)
-- Investment return %
-- Inflation rate %
-- Tax rate on traditional withdrawals %
-- Capital gains tax rate %
-- Safe withdrawal rate %
-- Withdrawal order (drag to reorder or preset)
-
-### What-If Panel
-
-Quick scenario sliders that update projections in real-time:
-
-- **Spending adjustment**: -20% to +20% slider
-- **FI age adjustment**: -5 to +5 years
-- **Return assumption**: 4% to 8% slider
-- **SS start age**: 62 / 67 / 70 toggle
-
-Show delta from baseline: "This adds 4 years to your runway"
-
-### Results Panel
+### Results Panel (Step 7)
 
 **Summary Metrics** (top cards)
 - FI Number: `annualSpending / SWR`
@@ -304,24 +333,23 @@ Show delta from baseline: "This adds 4 years to your runway"
 
 **Chart View**
 - Stacked area chart (Recharts AreaChart)
-- X-axis: Age (or Year)
+- X-axis: Age
 - Y-axis: Balance ($)
 - Areas: Taxable, Traditional, Roth (distinct colors)
-- Vertical reference lines:
-  - FI start age
-  - SS start age
-  - Age 59.5 (penalty-free withdrawals)
-  - Age 73 (RMDs begin)
 - Tooltip showing breakdown on hover
-- Red shading if/when balances hit zero
 
 **Table View**
 - Scrollable table with sticky header
-- Columns: Year | Age | Expenses | Income | Gap | Withdrawal | Source | Taxable | Traditional | Roth | Net Worth
-- Alternating row colors (subtle)
-- Highlight current year
+- Columns: Age | Expenses | Income | Gap | Withdrawal | Penalty | Source | Taxable | Traditional | Roth | Net Worth
+- Highlight FI start age, current age
 - Red text/background for shortfall years
-- Expandable rows for detail (optional V2)
+- Yellow highlight for penalty amounts
+
+**What-If Sliders**
+- Spending adjustment: -20% to +20%
+- FI age adjustment: -5 to +5 years
+- Return assumption: 4% to 8%
+- SS start age: 62 / 67 / 70
 
 ---
 
@@ -394,30 +422,47 @@ src/
 │   ├── inputs/
 │   │   ├── ProfileSection.tsx
 │   │   ├── AssetsSection.tsx
+│   │   ├── AssetRow.tsx           # Table row for assets
+│   │   ├── AssetEditForm.tsx      # Modal for add/edit asset
 │   │   ├── ExpensesSection.tsx
 │   │   ├── SocialSecuritySection.tsx
 │   │   ├── LifeEventsSection.tsx
+│   │   ├── LifeEventEditForm.tsx  # Modal for add/edit life event
 │   │   ├── AssumptionsSection.tsx
 │   │   └── WhatIfSection.tsx
-│   └── results/
-│       ├── SummaryMetrics.tsx
-│       ├── ChartView.tsx
-│       └── TableView.tsx
+│   ├── results/
+│   │   ├── SummaryMetrics.tsx
+│   │   ├── ChartView.tsx
+│   │   └── TableView.tsx
+│   └── wizard/
+│       ├── WizardContext.tsx      # Wizard state management
+│       ├── WizardLayout.tsx       # Main wizard container
+│       ├── WizardProgress.tsx     # Step indicator
+│       ├── WizardNavigation.tsx   # Back/Next buttons
+│       └── steps/
+│           ├── WelcomeStep.tsx
+│           ├── AssetsStep.tsx
+│           ├── SpendingStep.tsx
+│           ├── BenefitsStep.tsx
+│           ├── LifeEventsStep.tsx
+│           ├── AssumptionsStep.tsx
+│           └── ResultsStep.tsx
 ├── hooks/
-│   ├── useProjection.ts       # Core calculation logic
+│   ├── useProjection.ts       # Core calculation hook
 │   ├── useLocalStorage.ts
 │   └── useDebounce.ts
 ├── context/
-│   └── AppContext.tsx         # Global state
+│   └── AppContext.tsx         # Global state + migration
 ├── utils/
-│   ├── calculations.ts        # Projection math
+│   ├── calculations.ts        # Projection math + penalties
 │   ├── formatters.ts          # Currency, percent formatting
 │   ├── validators.ts          # Input validation
-│   └── exportImport.ts        # JSON handling
+│   ├── exportImport.ts        # JSON handling + migration
+│   └── migration.ts           # Legacy format migration
 ├── types/
 │   └── index.ts               # TypeScript interfaces
 ├── constants/
-│   └── defaults.ts            # Default values
+│   └── defaults.ts            # Default values + labels
 ├── App.tsx
 ├── main.tsx
 └── index.css                  # Tailwind + custom styles
@@ -435,15 +480,16 @@ export const DEFAULT_STATE: AppState = {
     lifeExpectancy: 95,
     state: 'CA',
     filingStatus: 'married',
+    spouseAge: 43,
   },
   assets: {
-    taxableBrokerage: { balance: 500000, costBasis: 300000 },
-    traditional401k: 800000,
-    traditionalIRA: 0,
-    roth401k: 0,
-    rothIRA: 200000,
-    hsa: 50000,
-    cash: 50000,
+    accounts: [
+      { id: '...', name: 'Taxable Brokerage', type: 'taxable', owner: 'joint', balance: 500000, costBasis: 300000 },
+      { id: '...', name: 'Traditional 401(k)', type: 'traditional', owner: 'self', balance: 800000, is401k: true },
+      { id: '...', name: 'Roth IRA', type: 'roth', owner: 'self', balance: 200000 },
+      { id: '...', name: 'HSA', type: 'hsa', owner: 'self', balance: 50000 },
+      { id: '...', name: 'Cash / Emergency Fund', type: 'cash', owner: 'joint', balance: 50000 },
+    ],
     homeEquity: 400000,
     pension: undefined,
   },
@@ -451,6 +497,12 @@ export const DEFAULT_STATE: AppState = {
     include: true,
     monthlyBenefit: 2500,
     startAge: 67,
+    colaRate: 0.02,
+    spouse: {
+      include: true,
+      monthlyBenefit: 2000,
+      startAge: 67,
+    },
   },
   expenses: {
     annualSpending: 80000,
@@ -464,6 +516,11 @@ export const DEFAULT_STATE: AppState = {
     rothTaxRate: 0,
     withdrawalOrder: ['taxable', 'traditional', 'roth'],
     safeWithdrawalRate: 0.04,
+    penaltySettings: {
+      earlyWithdrawalPenaltyRate: 0.10,
+      hsaEarlyPenaltyRate: 0.20,
+      enableRule55: false,
+    },
   },
 };
 ```
@@ -498,33 +555,32 @@ export const DEFAULT_STATE: AppState = {
 
 ## Development Phases
 
-### Phase 1: Foundation
-- [ ] Project setup (Vite + React + Tailwind)
-- [ ] Design system implementation (colors, typography, base components)
-- [ ] State management setup
-- [ ] Basic layout structure
+### Phase 1: Foundation ✅
+- [x] Project setup (Vite + React + Tailwind)
+- [x] Design system implementation (colors, typography, base components)
+- [x] State management setup
+- [x] Basic layout structure
 
-### Phase 2: Inputs
-- [ ] All input sections
-- [ ] Validation
-- [ ] Local storage persistence
+### Phase 2: Inputs ✅
+- [x] All input sections
+- [x] Validation
+- [x] Local storage persistence
 
-### Phase 3: Projection Engine
-- [ ] Core calculation logic
-- [ ] Unit tests for calculations
-- [ ] Hook integration
+### Phase 3: Projection Engine ✅
+- [x] Core calculation logic
+- [x] Penalty calculations (age 59.5, HSA 65, Rule of 55)
+- [x] Hook integration
 
-### Phase 4: Results Display
-- [ ] Summary metrics
-- [ ] Chart view with Recharts
-- [ ] Table view
+### Phase 4: Results Display ✅
+- [x] Summary metrics
+- [x] Chart view with Recharts
+- [x] Table view with penalty column
 
-### Phase 5: What-If & Polish
-- [ ] What-if sliders
-- [ ] Export/import
-- [ ] Responsive refinements
-- [ ] Performance optimization
-- [ ] Final polish
+### Phase 5: What-If & Polish ✅
+- [x] What-if sliders
+- [x] Export/import with migration support
+- [x] Wizard flow UX
+- [x] Table-based asset and life event entry
 
 ---
 
@@ -557,6 +613,7 @@ When building this app:
 
 **New Features:**
 - Table-based asset entry with custom names
+- Table-based life events entry with modal form
 - Asset ownership tracking (self, spouse, joint)
 - Age 59.5 early withdrawal penalty enforcement (10%)
 - HSA age 65 non-medical penalty (20%)
@@ -571,11 +628,13 @@ When building this app:
 - LegacyAssets type for migration support
 
 **UI Changes:**
-- Assets displayed as editable table with add/edit/delete
+- Assets displayed as editable table with add/edit/delete modal
+- Life Events displayed as editable table with add/edit/delete modal
 - Owner column shown when filing status is married
 - 401k and Rule of 55 badges on eligible accounts
 - Penalty settings section in Assumptions
 - Penalty column in year-by-year table
+- Wider wizard layouts for Assets and Life Events steps
 
 **Calculation Changes:**
 - Withdrawals check owner age before allowing penalty-free access
