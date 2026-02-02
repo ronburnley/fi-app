@@ -80,7 +80,7 @@ interface UserProfile {
   currentAge: number;
   targetFIAge: number;
   lifeExpectancy: number; // default 95
-  state: string; // for future tax context
+  state: string; // state code for tax calculations (e.g., 'CA', 'TX')
   filingStatus: 'single' | 'married';
   spouseAge?: number; // when married
 }
@@ -234,6 +234,19 @@ For each year from `currentAge` to `lifeExpectancy`:
 - `spouse` → uses `profile.spouseAge`
 - `joint` → uses older of the two (conservative)
 
+### State Tax Data
+```typescript
+interface StateTaxInfo {
+  code: string;
+  name: string;
+  hasIncomeTax: boolean;
+  incomeRate: number;       // Effective rate for income/traditional withdrawals
+  capitalGainsRate: number; // Rate for capital gains (taxable account withdrawals)
+}
+```
+
+State tax data is stored in `src/constants/stateTaxes.ts` for all 50 states + DC.
+
 ### Output Structure
 ```typescript
 interface YearProjection {
@@ -244,6 +257,8 @@ interface YearProjection {
   gap: number;
   withdrawal: number;
   withdrawalPenalty: number;
+  federalTax: number;  // Federal tax on withdrawals
+  stateTax: number;    // State tax on withdrawals
   withdrawalSource: string;
   taxableBalance: number;
   traditionalBalance: number;
@@ -340,7 +355,7 @@ interface YearProjection {
 
 **Table View**
 - Scrollable table with sticky header
-- Columns: Age | Expenses | Income | Gap | Withdrawal | Penalty | Source | Taxable | Traditional | Roth | Net Worth
+- Columns: Age | Expenses | Income | Gap | Withdrawal | Fed Tax | State Tax | Penalty | Source | Taxable | Traditional | Roth | Net Worth
 - Highlight FI start age, current age
 - Red text/background for shortfall years
 - Yellow highlight for penalty amounts
@@ -462,7 +477,8 @@ src/
 ├── types/
 │   └── index.ts               # TypeScript interfaces
 ├── constants/
-│   └── defaults.ts            # Default values + labels
+│   ├── defaults.ts            # Default values + labels
+│   └── stateTaxes.ts          # State tax rates (all 50 states + DC)
 ├── App.tsx
 ├── main.tsx
 └── index.css                  # Tailwind + custom styles
@@ -542,7 +558,7 @@ export const DEFAULT_STATE: AppState = {
 
 ### Out of Scope (Post-MVP)
 - User authentication / cloud sync
-- Detailed tax modeling (state taxes, IRMAA, ACA subsidies)
+- Detailed tax modeling (IRMAA, ACA subsidies)
 - Multiple scenarios saved side-by-side
 - Monte Carlo simulations
 - Account linking (Plaid)
@@ -608,6 +624,31 @@ When building this app:
 ---
 
 ## Changelog
+
+### v3.1 - 2026-02-02 - State Tax Calculations
+
+**New Features:**
+- State tax calculations on withdrawals (all 50 states + DC)
+- State selector in Profile section with tax rate hint
+- Federal and state taxes calculated and displayed separately
+- States with no income tax (TX, FL, WA, etc.) properly handled
+
+**Data Model Changes:**
+- Added StateTaxInfo type (code, name, hasIncomeTax, incomeRate, capitalGainsRate)
+- YearProjection now includes federalTax and stateTax fields
+- Assumptions tax rates clarified as federal rates only
+
+**UI Changes:**
+- State dropdown in Profile with hint showing effective tax rates
+- Fed Tax and State Tax columns in year-by-year table
+- Table column order: Gap → Withdrawal → Fed Tax → State Tax → Penalty → Source
+- Assumptions labels updated to clarify "Federal Income Tax" and "Federal Cap Gains"
+
+**Calculation Changes:**
+- Withdrawals now calculate combined federal + state tax burden
+- Traditional withdrawals: federal income rate + state income rate
+- Taxable withdrawals: federal cap gains rate + state cap gains rate
+- Gross withdrawal amount accounts for total tax to meet net spending need
 
 ### v3.0 - 2026-02-02 - Flexible Assets + Withdrawal Penalties
 
