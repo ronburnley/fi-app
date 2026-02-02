@@ -47,6 +47,12 @@ export function TableView() {
                 Withdrawal
               </th>
               <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                Fed Tax
+              </th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                State Tax
+              </th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Penalty
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-text-muted whitespace-nowrap">
@@ -111,6 +117,12 @@ export function TableView() {
                   </td>
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.withdrawal > 0 ? formatCurrency(projection.withdrawal) : '-'}
+                  </td>
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                    {projection.federalTax > 0 ? formatCurrency(projection.federalTax) : '-'}
+                  </td>
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                    {projection.stateTax > 0 ? formatCurrency(projection.stateTax) : '-'}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                     <span className={projection.withdrawalPenalty > 0 ? 'text-accent-warning font-medium' : 'text-text-muted'}>
