@@ -10,10 +10,19 @@ export function TableView() {
 
   const effectiveFIAge = state.profile.targetFIAge;
 
-  // Filter to show only FI years by default, or all years if toggled
+  // Check if there are any shortfalls in the projection
+  const hasAnyShortfall = projections.some((p) => p.isShortfall);
+  const firstShortfallAge = projections.find((p) => p.isShortfall)?.age;
+
+  // Filter logic:
+  // - If any shortfall exists, show from first shortfall year onward
+  // - Otherwise show from FI age onward
+  // - "Show all years" always shows everything
   const displayProjections = showAllYears
     ? projections
-    : projections.filter((p) => p.age >= effectiveFIAge);
+    : hasAnyShortfall && firstShortfallAge !== undefined
+      ? projections.filter((p) => p.age >= firstShortfallAge)
+      : projections.filter((p) => p.age >= effectiveFIAge);
 
   return (
     <div className="bg-bg-secondary border border-border-subtle rounded-lg overflow-hidden">
@@ -75,7 +84,8 @@ export function TableView() {
           <tbody className="divide-y divide-border-subtle">
             {displayProjections.map((projection, index) => {
               const isCurrentAge = projection.age === state.profile.currentAge;
-              const isFIStart = projection.age === effectiveFIAge;
+              // Only show FI badge if there are no shortfalls (FI was actually achieved)
+              const isFIStart = !hasAnyShortfall && projection.age === effectiveFIAge;
 
               return (
                 <tr
