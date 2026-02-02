@@ -11,10 +11,11 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onC
   value: string | number;
   onChange: (value: string | number) => void;
   error?: string;
+  hint?: string;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, options, value, onChange, error, className = '', id, ...props }, ref) => {
+  ({ label, options, value, onChange, error, hint, className = '', id, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
     return (
@@ -50,6 +51,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             </option>
           ))}
         </select>
+        {hint && !error && (
+          <p className="mt-1 text-xs text-text-muted">{hint}</p>
+        )}
         {error && (
           <p className="mt-1 text-xs text-accent-danger">{error}</p>
         )}

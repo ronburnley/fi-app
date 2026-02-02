@@ -1,5 +1,6 @@
 import { Card, Input, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
+import { getStateOptions, formatStateTaxHint } from '../../constants/stateTaxes';
 
 export function ProfileSection() {
   const { state, dispatch } = useApp();
@@ -50,6 +51,13 @@ export function ProfileSection() {
             { value: 'single', label: 'Single' },
             { value: 'married', label: 'Married Filing Jointly' },
           ]}
+        />
+        <Select
+          label="State of Residence"
+          value={profile.state}
+          onChange={(value) => updateProfile('state', value)}
+          options={getStateOptions()}
+          hint={formatStateTaxHint(profile.state)}
         />
         {profile.filingStatus === 'married' && (
           <Input

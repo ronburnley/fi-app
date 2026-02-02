@@ -7,8 +7,10 @@ import type {
   Asset,
   AccountOwner,
   PenaltySettings,
+  StateTaxInfo,
 } from '../types';
 import { PENALTY_FREE_AGES } from '../constants/defaults';
+import { getStateTaxInfo } from '../constants/stateTaxes';
 
 interface AccountBalances {
   taxable: number;
@@ -27,6 +29,8 @@ interface AssetWithBalance extends Asset {
 interface WithdrawalResult {
   amount: number;
   penalty: number;
+  federalTax: number;
+  stateTax: number;
   source: string;
   balances: AccountBalances;
   assetBalances: Map<string, { balance: number; costBasis?: number }>; // Track individual asset balances
@@ -176,6 +180,7 @@ function withdrawFromAccounts(
   withdrawalOrder: WithdrawalSource[],
   traditionalTaxRate: number,
   capitalGainsTaxRate: number,
+  stateTaxInfo: StateTaxInfo,
   selfAge: number,
   spouseAge: number | undefined,
   penaltySettings: PenaltySettings
@@ -183,6 +188,8 @@ function withdrawFromAccounts(
   let remaining = needed;
   let totalWithdrawn = 0;
   let totalPenalty = 0;
+  let totalFederalTax = 0;
+  let totalStateTax = 0;
   const sources: string[] = [];
   const newAssetBalanceMap = new Map(assetBalanceMap);
 
@@ -239,22 +246,47 @@ function withdrawFromAccounts(
       if (available <= 0) continue;
 
       // Calculate gross withdrawal needed (accounting for tax)
+      // Combined tax rate = federal + state
       let grossWithdrawal: number;
+      let federalTaxOnWithdrawal = 0;
+      let stateTaxOnWithdrawal = 0;
+
       if (sourceType === 'roth') {
         grossWithdrawal = remaining;
+        // No tax on Roth withdrawals
       } else if (sourceType === 'traditional') {
-        grossWithdrawal = remaining / (1 - traditionalTaxRate);
+        const combinedTaxRate = traditionalTaxRate + stateTaxInfo.incomeRate;
+        grossWithdrawal = remaining / (1 - combinedTaxRate);
       } else {
         // Taxable: approximate - gains are only part of withdrawal
         const costBasisRatio = balanceInfo.costBasis !== undefined && available > 0
           ? balanceInfo.costBasis / available
           : 0.6; // Assume 60% cost basis if unknown
         const gainRatio = 1 - Math.min(1, costBasisRatio);
-        const effectiveTaxRate = gainRatio * capitalGainsTaxRate;
+        const combinedCapGainsRate = capitalGainsTaxRate + stateTaxInfo.capitalGainsRate;
+        const effectiveTaxRate = gainRatio * combinedCapGainsRate;
         grossWithdrawal = remaining / (1 - effectiveTaxRate);
       }
 
       const withdrawal = Math.min(grossWithdrawal, available);
+
+      // Calculate taxes on this withdrawal
+      if (sourceType === 'traditional') {
+        federalTaxOnWithdrawal = withdrawal * traditionalTaxRate;
+        stateTaxOnWithdrawal = withdrawal * stateTaxInfo.incomeRate;
+      } else if (sourceType === 'taxable') {
+        const costBasisRatio = balanceInfo.costBasis !== undefined && available > 0
+          ? balanceInfo.costBasis / available
+          : 0.6;
+        const gainRatio = 1 - Math.min(1, costBasisRatio);
+        const taxableGains = withdrawal * gainRatio;
+        federalTaxOnWithdrawal = taxableGains * capitalGainsTaxRate;
+        stateTaxOnWithdrawal = taxableGains * stateTaxInfo.capitalGainsRate;
+      }
+      // Roth and Cash: no taxes
+
+      totalFederalTax += federalTaxOnWithdrawal;
+      totalStateTax += stateTaxOnWithdrawal;
 
       // Calculate penalty
       const penalty = calculatePenalty(
@@ -281,17 +313,12 @@ function withdrawFromAccounts(
       }
 
       // Calculate net after tax (penalty reduces net further)
+      const totalTaxOnWithdrawal = federalTaxOnWithdrawal + stateTaxOnWithdrawal;
       let netAfterTax: number;
       if (sourceType === 'roth') {
         netAfterTax = withdrawal - penalty;
-      } else if (sourceType === 'traditional') {
-        netAfterTax = withdrawal * (1 - traditionalTaxRate) - penalty;
       } else {
-        const costBasisRatio = balanceInfo.costBasis !== undefined && available > 0
-          ? balanceInfo.costBasis / available
-          : 0.6;
-        const gainRatio = 1 - Math.min(1, costBasisRatio);
-        netAfterTax = withdrawal * (1 - gainRatio * capitalGainsTaxRate) - penalty;
+        netAfterTax = withdrawal - totalTaxOnWithdrawal - penalty;
       }
 
       remaining -= Math.max(0, netAfterTax);
@@ -378,6 +405,8 @@ function withdrawFromAccounts(
   return {
     amount: totalWithdrawn,
     penalty: totalPenalty,
+    federalTax: totalFederalTax,
+    stateTax: totalStateTax,
     source: sources.join(', ') || 'None',
     balances: newBalances,
     assetBalances: newAssetBalanceMap,
@@ -448,6 +477,7 @@ export function calculateProjection(
 
   const { assumptions, socialSecurity, lifeEvents, profile, assets } = state;
   const penaltySettings = assumptions.penaltySettings;
+  const stateTaxInfo = getStateTaxInfo(profile.state);
 
   for (let age = profile.currentAge; age <= profile.lifeExpectancy; age++) {
     const year = currentYear + (age - profile.currentAge);
@@ -502,6 +532,8 @@ export function calculateProjection(
     // Withdraw from accounts if in FI
     let withdrawal = 0;
     let withdrawalPenalty = 0;
+    let federalTax = 0;
+    let stateTax = 0;
     let withdrawalSource = 'N/A';
 
     if (isInFI && gap > 0) {
@@ -512,12 +544,15 @@ export function calculateProjection(
         assumptions.withdrawalOrder,
         assumptions.traditionalTaxRate,
         assumptions.capitalGainsTaxRate,
+        stateTaxInfo,
         age,
         spouseAge,
         penaltySettings
       );
       withdrawal = result.amount;
       withdrawalPenalty = result.penalty;
+      federalTax = result.federalTax;
+      stateTax = result.stateTax;
       withdrawalSource = result.source;
       balances = result.balances;
       assetBalanceMap = result.assetBalances;
@@ -538,6 +573,8 @@ export function calculateProjection(
       gap,
       withdrawal,
       withdrawalPenalty,
+      federalTax,
+      stateTax,
       withdrawalSource,
       taxableBalance: balances.taxable,
       traditionalBalance: balances.traditional,

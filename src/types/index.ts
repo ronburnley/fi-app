@@ -7,6 +7,14 @@ export interface UserProfile {
   spouseAge?: number;
 }
 
+export interface StateTaxInfo {
+  code: string;
+  name: string;
+  hasIncomeTax: boolean;
+  incomeRate: number;      // Effective rate for income/traditional withdrawals
+  capitalGainsRate: number; // Rate for capital gains (taxable account withdrawals)
+}
+
 export interface Pension {
   annualBenefit: number;
   startAge: number;
@@ -107,6 +115,8 @@ export interface YearProjection {
   gap: number;
   withdrawal: number;
   withdrawalPenalty: number;
+  federalTax: number;
+  stateTax: number;
   withdrawalSource: string;
   taxableBalance: number;
   traditionalBalance: number;

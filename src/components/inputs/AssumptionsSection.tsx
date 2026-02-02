@@ -51,16 +51,18 @@ export function AssumptionsSection() {
           <p className="text-xs text-text-muted mb-3">Tax Rates on Withdrawals</p>
           <div className="grid grid-cols-2 gap-3">
             <PercentInput
-              label="Traditional (Income)"
+              label="Federal Income Tax"
               value={assumptions.traditionalTaxRate}
               onChange={(value) => updateAssumptions('traditionalTaxRate', value)}
+              hint="For traditional withdrawals"
               min={0}
               max={50}
             />
             <PercentInput
-              label="Capital Gains"
+              label="Federal Cap Gains"
               value={assumptions.capitalGainsTaxRate}
               onChange={(value) => updateAssumptions('capitalGainsTaxRate', value)}
+              hint="For taxable account gains"
               min={0}
               max={40}
             />
