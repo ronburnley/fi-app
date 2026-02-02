@@ -539,7 +539,14 @@ export function calculateProjection(
     // Life events: positive = expense, negative = income
     const totalExpenses = yearExpenses + Math.max(0, lifeEventTotal);
     const totalIncome = income + Math.abs(Math.min(0, lifeEventTotal));
-    const gap = isInFI ? Math.max(0, totalExpenses - totalIncome) : 0;
+
+    // During FI: gap covers regular expenses + life events
+    // Before FI: only life events affect portfolio (regular expenses covered by salary)
+    const fiGap = isInFI ? Math.max(0, totalExpenses - totalIncome) : 0;
+
+    // Life events during working years still affect portfolio directly
+    // Positive = expense (withdraw from portfolio), Negative = income (add to portfolio)
+    const preFILifeEventImpact = !isInFI ? lifeEventTotal : 0;
 
     // Withdraw from accounts if in FI
     let withdrawal = 0;
@@ -548,9 +555,55 @@ export function calculateProjection(
     let stateTax = 0;
     let withdrawalSource = 'N/A';
 
-    if (isInFI && gap > 0) {
+    // Handle pre-FI life events (direct portfolio adjustment)
+    if (!isInFI && preFILifeEventImpact !== 0) {
+      if (preFILifeEventImpact > 0) {
+        // Expense: withdraw from portfolio
+        const result = withdrawFromAccounts(
+          preFILifeEventImpact,
+          assets.accounts,
+          assetBalanceMap,
+          assumptions.withdrawalOrder,
+          assumptions.traditionalTaxRate,
+          assumptions.capitalGainsTaxRate,
+          stateTaxInfo,
+          age,
+          spouseAge,
+          penaltySettings
+        );
+        withdrawal = result.amount;
+        withdrawalPenalty = result.penalty;
+        federalTax = result.federalTax;
+        stateTax = result.stateTax;
+        withdrawalSource = result.source + ' (Life Event)';
+        balances = result.balances;
+        assetBalanceMap = result.assetBalances;
+      } else {
+        // Income: add to portfolio (put in cash for simplicity)
+        const incomeAmount = Math.abs(preFILifeEventImpact);
+        // Find cash account or first taxable account to deposit into
+        for (const asset of assets.accounts) {
+          if (asset.type === 'cash' || asset.type === 'taxable') {
+            const balanceInfo = assetBalanceMap.get(asset.id);
+            if (balanceInfo) {
+              assetBalanceMap.set(asset.id, {
+                ...balanceInfo,
+                balance: balanceInfo.balance + incomeAmount,
+              });
+              balances.cash += asset.type === 'cash' ? incomeAmount : 0;
+              balances.taxable += asset.type === 'taxable' ? incomeAmount : 0;
+              withdrawalSource = 'Life Event Income';
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Handle FI withdrawals for regular expenses
+    if (isInFI && fiGap > 0) {
       const result = withdrawFromAccounts(
-        gap,
+        fiGap,
         assets.accounts,
         assetBalanceMap,
         assumptions.withdrawalOrder,
@@ -570,17 +623,21 @@ export function calculateProjection(
       assetBalanceMap = result.assetBalances;
     }
 
-    // Check for shortfall
+    // Check for shortfall (can happen during FI or with large pre-FI life events)
     const totalBalance = balances.taxable + balances.traditional + balances.roth + balances.hsa + balances.cash;
-    const isShortfall = isInFI && gap > 0 && totalBalance < gap && withdrawal < gap;
+    const neededAmount = isInFI ? fiGap : preFILifeEventImpact;
+    const isShortfall = neededAmount > 0 && totalBalance < neededAmount && withdrawal < neededAmount;
 
     // Record this year's projection
     const totalNetWorth = totalBalance + (assets.homeEquity || 0);
 
+    // Gap represents what needs to come from portfolio
+    const gap = isInFI ? fiGap : Math.max(0, preFILifeEventImpact);
+
     projections.push({
       year,
       age,
-      expenses: yearExpenses + lifeEventTotal,
+      expenses: yearExpenses + Math.max(0, lifeEventTotal),
       income: totalIncome,
       gap,
       withdrawal,
