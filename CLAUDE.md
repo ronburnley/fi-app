@@ -2,7 +2,9 @@
 
 ## Overview
 
-**FI Runway** is a financial independence verification tool for people approaching or considering early retirement. The app answers one core question: *"Given what I have, what I spend, and reasonable assumptions, will my money last?"*
+**FI Runway** is a financial independence verification tool for people approaching or considering early retirement. The app answers one core question: *"When can I achieve financial independence?"*
+
+The app **calculates** the earliest achievable FI age based on the user's financial inputs, rather than having them specify a target date.
 
 ### Target User
 People who have accumulated wealth and need confidence in their exit plan. They don't need help building wealth—they need verification that they can stop working.
@@ -78,13 +80,15 @@ Borders:
 ```typescript
 interface UserProfile {
   currentAge: number;
-  targetFIAge: number;
-  lifeExpectancy: number; // default 95
-  state: string; // state code for tax calculations (e.g., 'CA', 'TX')
+  targetFIAge: number;      // COMPUTED - auto-set to earliest achievable FI age
+  lifeExpectancy: number;   // default 95
+  state: string;            // state code for tax calculations (e.g., 'CA', 'TX')
   filingStatus: 'single' | 'married';
-  spouseAge?: number; // when married
+  spouseAge?: number;       // when married
 }
 ```
+
+Note: `targetFIAge` is automatically calculated by the app based on the user's financial inputs. Users do not set this value directly.
 
 ### Assets (v3 - Array-based)
 ```typescript
@@ -177,6 +181,23 @@ interface AppState {
   assumptions: Assumptions;
 }
 ```
+
+### AchievableFIResult
+```typescript
+interface AchievableFIResult {
+  achievableFIAge: number | null;  // null if never achievable
+  confidenceLevel: 'high' | 'moderate' | 'tight' | 'not_achievable';
+  bufferYears: number;             // years past life expectancy
+  yearsUntilFI: number | null;     // from current age
+  fiAtCurrentAge: boolean;         // already FI?
+}
+```
+
+Confidence levels:
+- `high`: 10+ years buffer past life expectancy
+- `moderate`: 5-9 years buffer
+- `tight`: 0-4 years buffer
+- `not_achievable`: shortfall detected before life expectancy
 
 ---
 
@@ -277,7 +298,7 @@ interface YearProjection {
 ### Layout (Wizard Flow)
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Logo                                    [Import] [Export]  │
+│  Logo          [FI Status Indicator]     [Import] [Export]  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │              ●───●───○───○───○───○───○                      │
@@ -304,13 +325,15 @@ interface YearProjection {
 
 ### Wizard Steps
 
-1. **Welcome** - Profile basics (ages, filing status)
+1. **Welcome** - Profile basics (ages, filing status, state, life expectancy)
 2. **Assets** - Table-based asset entry with add/edit/delete
 3. **Spending** - Annual expenses
 4. **Benefits** - Social Security (self + spouse), pension
 5. **Life Events** - Table-based one-time income/expenses
 6. **Assumptions** - Returns, inflation, taxes, penalties (optional)
 7. **Results** - Summary, chart, table, what-if sliders
+
+Note: The FI age is calculated automatically and displayed in the header indicator starting from step 2.
 
 ### Assets Table
 ```
@@ -361,10 +384,11 @@ interface YearProjection {
 - Yellow highlight for penalty amounts
 
 **What-If Sliders**
-- Spending adjustment: -20% to +20%
-- FI age adjustment: -5 to +5 years
-- Return assumption: 4% to 8%
+- Spending adjustment: -30% to +30%
+- Return assumption: 2% to 12%
 - SS start age: 62 / 67 / 70
+
+Note: FI age is no longer adjustable via slider - it's calculated based on inputs. Changes to spending or returns will automatically recalculate the achievable FI age shown in the header.
 
 ---
 
@@ -374,6 +398,7 @@ interface YearProjection {
 App
 ├── Header
 │   ├── Logo
+│   ├── FIStatusIndicator      # Center - shows years to FI
 │   └── ImportExportButtons
 ├── MainLayout
 │   ├── InputPanel
@@ -429,7 +454,8 @@ src/
 │   │   ├── Select.tsx
 │   │   ├── Slider.tsx
 │   │   ├── Card.tsx
-│   │   └── Tooltip.tsx
+│   │   ├── Tooltip.tsx
+│   │   └── FIStatusIndicator.tsx  # Header indicator showing years to FI
 │   ├── layout/
 │   │   ├── Header.tsx
 │   │   ├── MainLayout.tsx
@@ -464,6 +490,7 @@ src/
 │           └── ResultsStep.tsx
 ├── hooks/
 │   ├── useProjection.ts       # Core calculation hook
+│   ├── useAchievableFI.ts     # Calculates earliest achievable FI age
 │   ├── useLocalStorage.ts
 │   └── useDebounce.ts
 ├── context/
@@ -624,6 +651,37 @@ When building this app:
 ---
 
 ## Changelog
+
+### v4.0 - 2026-02-02 - Inverted FI Model (Calculated FI Age)
+
+**Major Change:**
+The app now **calculates** the earliest achievable FI age instead of having the user input their target. This answers "When CAN I retire?" rather than "Will my target work?"
+
+**New Features:**
+- `calculateAchievableFIAge()` function using binary search algorithm
+- FIStatusIndicator component in header ("mission control" style)
+- `useAchievableFI` hook for memoized achievable FI calculations
+- Confidence levels: high, moderate, tight, not_achievable
+- Real-time FI age updates as inputs change
+
+**Data Model Changes:**
+- `targetFIAge` is now computed/synced automatically (not user input)
+- Added `AchievableFIResult` interface
+- Removed `fiAgeAdjustment` from `WhatIfAdjustments`
+
+**UI Changes:**
+- Header redesigned with 3-column grid layout (logo | indicator | buttons)
+- FI Status Indicator shows years to FI with confidence dot
+- States: hidden (step 1), achievable, immediate ("FI NOW"), unreachable
+- WelcomeStep no longer has "Years to FI" slider
+- SummaryMetrics shows "Achievable FI Age" as primary metric
+- What-If section no longer has FI age adjustment slider
+
+**Calculation Changes:**
+- Binary search finds earliest viable FI age (~7 iterations max)
+- Buffer years calculated by extending projection to age 120
+- Confidence based on buffer: 10+ (high), 5-9 (moderate), 0-4 (tight)
+- AppContext auto-syncs `targetFIAge` with calculated value
 
 ### v3.1 - 2026-02-02 - State Tax Calculations
 
