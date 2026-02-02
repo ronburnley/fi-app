@@ -92,6 +92,19 @@ export const ACCOUNT_TYPE_LABELS: Record<Asset['type'], string> = {
   roth: 'Roth',
   hsa: 'HSA',
   cash: 'Cash',
+  '529': '529',
+  other: 'Other',
+};
+
+// Account type colors for visual identification
+export const ACCOUNT_TYPE_COLORS: Record<Asset['type'], string> = {
+  taxable: '#a78bfa',    // purple
+  traditional: '#60a5fa', // blue
+  roth: '#34d399',       // green
+  hsa: '#fbbf24',        // yellow
+  cash: '#94a3b8',       // gray
+  '529': '#f472b6',      // pink
+  other: '#71717a',      // dark gray
 };
 
 // Account owner display names
@@ -108,4 +121,6 @@ export const PENALTY_FREE_AGES: Record<Asset['type'], number> = {
   traditional: 59.5,
   roth: 59.5,
   hsa: 65,
+  '529': 0,      // No penalty (treated like taxable)
+  other: 0,      // No penalty (treated like taxable)
 };

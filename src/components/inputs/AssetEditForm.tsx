@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import type { Asset, AccountType, AccountOwner } from '../../types';
 import { Input, CurrencyInput, Toggle, Select, Button } from '../ui';
 import { generateId } from '../../utils/migration';
-import { ACCOUNT_TYPE_LABELS, ACCOUNT_OWNER_LABELS } from '../../constants/defaults';
+import { ACCOUNT_TYPE_LABELS } from '../../constants/defaults';
 
 interface AssetEditFormProps {
   asset?: Asset;
   isMarried: boolean;
   onSave: (asset: Asset) => void;
+  onDelete?: () => void;
   onCancel: () => void;
 }
 
@@ -17,9 +18,11 @@ const ACCOUNT_TYPE_OPTIONS = [
   { value: 'roth', label: ACCOUNT_TYPE_LABELS.roth },
   { value: 'hsa', label: ACCOUNT_TYPE_LABELS.hsa },
   { value: 'cash', label: ACCOUNT_TYPE_LABELS.cash },
+  { value: '529', label: ACCOUNT_TYPE_LABELS['529'] },
+  { value: 'other', label: ACCOUNT_TYPE_LABELS.other },
 ];
 
-export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditFormProps) {
+export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: AssetEditFormProps) {
   const [name, setName] = useState(asset?.name ?? '');
   const [type, setType] = useState<AccountType>(asset?.type ?? 'taxable');
   const [owner, setOwner] = useState<AccountOwner>(asset?.owner ?? 'self');
@@ -27,14 +30,6 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
   const [costBasis, setCostBasis] = useState(asset?.costBasis ?? 0);
   const [is401k, setIs401k] = useState(asset?.is401k ?? false);
   const [separatedFromService, setSeparatedFromService] = useState(asset?.separatedFromService ?? false);
-
-  const ownerOptions = isMarried
-    ? [
-        { value: 'self', label: ACCOUNT_OWNER_LABELS.self },
-        { value: 'spouse', label: ACCOUNT_OWNER_LABELS.spouse },
-        { value: 'joint', label: ACCOUNT_OWNER_LABELS.joint },
-      ]
-    : [{ value: 'self', label: ACCOUNT_OWNER_LABELS.self }];
 
   // Reset owner to 'self' if not married and owner was spouse
   useEffect(() => {
@@ -62,7 +57,7 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
       balance,
     };
 
-    if (type === 'taxable') {
+    if (type === 'taxable' || type === '529' || type === 'other') {
       newAsset.costBasis = costBasis;
     }
 
@@ -88,21 +83,26 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
         return 'HSA';
       case 'cash':
         return 'Cash';
+      case '529':
+        return '529 Plan';
+      case 'other':
+        return 'Other Account';
     }
   };
 
   const isRetirementAccount = type === 'traditional' || type === 'roth';
+  const showCostBasis = type === 'taxable' || type === '529' || type === 'other';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-secondary border border-border-default rounded-lg w-full max-w-md">
-        <div className="px-4 py-3 border-b border-border-subtle">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl w-full max-w-md">
+        <div className="px-5 py-4 border-b border-zinc-800">
           <h3 className="text-lg font-semibold text-text-primary">
-            {asset ? 'Edit Asset' : 'Add Asset'}
+            {asset ? 'Edit Account' : 'Add Account'}
           </h3>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
           <Input
             label="Account Name"
             value={name}
@@ -110,21 +110,45 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
             placeholder={getDefaultName(type)}
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Select
-              label="Account Type"
-              options={ACCOUNT_TYPE_OPTIONS}
-              value={type}
-              onChange={(value) => setType(value as AccountType)}
-            />
+          <Select
+            label="Account Type"
+            options={ACCOUNT_TYPE_OPTIONS}
+            value={type}
+            onChange={(value) => setType(value as AccountType)}
+          />
 
-            <Select
-              label="Owner"
-              options={ownerOptions}
-              value={owner}
-              onChange={(value) => setOwner(value as AccountOwner)}
-            />
-          </div>
+          {/* Owner segmented control - only show when married */}
+          {isMarried && (
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-2">
+                Owner
+              </label>
+              <div className="flex gap-1 p-1 bg-zinc-800/50 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setOwner('self')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    owner === 'self'
+                      ? 'bg-zinc-700 text-text-primary'
+                      : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  Self
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOwner('spouse')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    owner === 'spouse'
+                      ? 'bg-zinc-700 text-text-primary'
+                      : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  Spouse
+                </button>
+              </div>
+            </div>
+          )}
 
           <CurrencyInput
             label="Balance"
@@ -132,7 +156,7 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
             onChange={setBalance}
           />
 
-          {type === 'taxable' && (
+          {showCostBasis && (
             <CurrencyInput
               label="Cost Basis"
               value={costBasis}
@@ -142,7 +166,7 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
           )}
 
           {isRetirementAccount && (
-            <div className="pt-2 border-t border-border-subtle space-y-3">
+            <div className="pt-3 border-t border-zinc-800 space-y-3">
               <Toggle
                 label="This is a 401(k)"
                 checked={is401k}
@@ -166,12 +190,23 @@ export function AssetEditForm({ asset, isMarried, onSave, onCancel }: AssetEditF
             </div>
           )}
 
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={onCancel} className="flex-1">
+          <div className="flex gap-3 pt-3">
+            {asset && onDelete && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onDelete}
+                className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+              >
+                Delete
+              </Button>
+            )}
+            <div className="flex-1" />
+            <Button type="button" variant="secondary" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
-              {asset ? 'Save' : 'Add Asset'}
+            <Button type="submit">
+              {asset ? 'Save' : 'Add Account'}
             </Button>
           </div>
         </form>

@@ -63,8 +63,8 @@ function isPenaltyFree(
   const ownerAge = getOwnerAge(asset.owner, selfAge, spouseAge);
   const penaltyFreeAge = PENALTY_FREE_AGES[asset.type];
 
-  // Cash and taxable are always penalty-free
-  if (asset.type === 'cash' || asset.type === 'taxable') {
+  // Cash, taxable, 529, and other are always penalty-free
+  if (asset.type === 'cash' || asset.type === 'taxable' || asset.type === '529' || asset.type === 'other') {
     return true;
   }
 
@@ -120,6 +120,9 @@ function aggregateBalances(assets: Asset[]): AccountBalances {
   for (const asset of assets) {
     switch (asset.type) {
       case 'taxable':
+      case '529':
+      case 'other':
+        // 529 and other treated like taxable for withdrawal purposes
         balances.taxable += asset.balance;
         balances.taxableCostBasis += asset.costBasis ?? 0;
         break;
@@ -229,9 +232,14 @@ function withdrawFromAccounts(
   for (const sourceType of withdrawalOrder) {
     if (remaining <= 0) break;
 
-    // Get all assets of this type
+    // Get all assets of this type (529 and other are treated as taxable)
     const typeAssets = sortAssetsForWithdrawal(
-      assetsWithBalances.filter((a) => a.type === sourceType && a.currentBalance > 0),
+      assetsWithBalances.filter((a) => {
+        if (sourceType === 'taxable') {
+          return (a.type === 'taxable' || a.type === '529' || a.type === 'other') && a.currentBalance > 0;
+        }
+        return a.type === sourceType && a.currentBalance > 0;
+      }),
       selfAge,
       spouseAge,
       penaltySettings
@@ -384,6 +392,9 @@ function withdrawFromAccounts(
 
     switch (asset.type) {
       case 'taxable':
+      case '529':
+      case 'other':
+        // 529 and other treated like taxable for withdrawal purposes
         newBalances.taxable += balanceInfo.balance;
         newBalances.taxableCostBasis += balanceInfo.costBasis ?? 0;
         break;

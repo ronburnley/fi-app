@@ -21,7 +21,7 @@ export interface Pension {
 }
 
 // v3: Flexible asset types
-export type AccountType = 'taxable' | 'traditional' | 'roth' | 'hsa' | 'cash';
+export type AccountType = 'taxable' | 'traditional' | 'roth' | 'hsa' | 'cash' | '529' | 'other';
 export type AccountOwner = 'self' | 'spouse' | 'joint';
 
 export interface Asset {
