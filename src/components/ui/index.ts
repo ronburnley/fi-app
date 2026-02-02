@@ -7,3 +7,4 @@ export { Select } from './Select';
 export { Slider } from './Slider';
 export { Card } from './Card';
 export { Tooltip } from './Tooltip';
+export { FIStatusIndicator } from './FIStatusIndicator';

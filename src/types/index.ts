@@ -139,7 +139,6 @@ export interface ProjectionSummary {
 
 export interface WhatIfAdjustments {
   spendingAdjustment: number; // -0.2 to +0.2
-  fiAgeAdjustment: number; // -5 to +5 years
   returnAdjustment: number; // override investment return
   ssStartAge: 62 | 67 | 70;
   spouseSSStartAge?: 62 | 67 | 70;
@@ -148,6 +147,14 @@ export interface WhatIfAdjustments {
 export interface WizardState {
   currentStep: number;
   maxVisitedStep: number;
+}
+
+export interface AchievableFIResult {
+  achievableFIAge: number | null;  // null if never achievable
+  confidenceLevel: 'high' | 'moderate' | 'tight' | 'not_achievable';
+  bufferYears: number;
+  yearsUntilFI: number | null;
+  fiAtCurrentAge: boolean;
 }
 
 export type AppAction =

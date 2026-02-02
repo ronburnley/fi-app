@@ -9,23 +9,11 @@ export function WelcomeStep() {
 
   const isMarried = profile.filingStatus === 'married';
 
-  // Compute yearsToFI from targetFIAge, clamped to 1-30
-  const yearsToFI = Math.min(30, Math.max(1, profile.targetFIAge - profile.currentAge));
-
-  // Computed FI ages for display
-  const yourFIAge = profile.currentAge + yearsToFI;
-  const spouseFIAge = isMarried && profile.spouseAge ? profile.spouseAge + yearsToFI : null;
-
   const updateProfile = (field: string, value: number | string) => {
     dispatch({
       type: 'UPDATE_PROFILE',
       payload: { [field]: value },
     });
-  };
-
-  const handleYearsToFIChange = (newYears: number) => {
-    const newTargetAge = profile.currentAge + newYears;
-    updateProfile('targetFIAge', newTargetAge);
   };
 
   // Format state tax hint in the new format
@@ -47,7 +35,7 @@ export function WelcomeStep() {
           Welcome to FI Runway
         </h1>
         <p className="text-text-secondary">
-          Let's start by learning about you and your financial independence goals.
+          Answer a few questions and we'll calculate when you can achieve financial independence.
         </p>
       </div>
 
@@ -125,70 +113,26 @@ export function WelcomeStep() {
               type="number"
               value={profile.lifeExpectancy}
               onChange={(e) => updateProfile('lifeExpectancy', parseInt(e.target.value) || 0)}
-              min={profile.targetFIAge + 1}
+              min={profile.currentAge + 1}
               max={120}
             />
           </div>
         </div>
       </Card>
 
-      {/* Years to FI Hero Section */}
-      <div className="mt-6 relative overflow-hidden rounded-xl border border-border-subtle bg-bg-secondary">
-        {/* Gradient overlay at top */}
-        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-accent-blue/10 to-transparent pointer-events-none" />
-
-        <div className="relative px-6 pt-8 pb-6">
-          {/* Hero number with glow */}
-          <div className="text-center mb-6">
-            <div className="relative inline-block">
-              {/* Glow effect */}
-              <div className="absolute inset-0 blur-2xl bg-accent-blue/20 scale-150" />
-              <span className="relative text-8xl font-extrabold text-text-primary tabular-nums">
-                {yearsToFI}
-              </span>
-            </div>
-            <p className="text-text-secondary mt-2 text-lg">
-              years to financial independence
+      {/* Info callout */}
+      <div className="mt-6 relative overflow-hidden rounded-xl border border-border-subtle bg-bg-secondary p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-accent-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-text-primary font-medium mb-1">How it works</p>
+            <p className="text-sm text-text-secondary">
+              Enter your assets, spending, and benefits in the following steps. We'll calculate the earliest age you can achieve financial independence based on your current situation.
             </p>
-          </div>
-
-          {/* Slider */}
-          <div className="mb-4">
-            <input
-              type="range"
-              min={1}
-              max={30}
-              value={yearsToFI}
-              onChange={(e) => handleYearsToFIChange(parseInt(e.target.value))}
-              className="fi-slider"
-              style={{
-                background: `linear-gradient(to right, var(--color-accent-blue) 0%, var(--color-accent-blue) ${((yearsToFI - 1) / 29) * 100}%, var(--color-border-default) ${((yearsToFI - 1) / 29) * 100}%, var(--color-border-default) 100%)`
-              }}
-            />
-            <div className="flex justify-between text-xs text-text-muted mt-2">
-              <span>1 year</span>
-              <span>30 years</span>
-            </div>
-          </div>
-
-          {/* FI Ages Display */}
-          <div className="border-t border-border-subtle pt-4 mt-4">
-            <div className="flex items-center justify-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-accent-blue" />
-                <span className="text-text-secondary">
-                  You at <span className="text-text-primary font-semibold">{yourFIAge}</span>
-                </span>
-              </div>
-              {isMarried && spouseFIAge && (
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-accent-primary" />
-                  <span className="text-text-secondary">
-                    Spouse at <span className="text-text-primary font-semibold">{spouseFIAge}</span>
-                  </span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>

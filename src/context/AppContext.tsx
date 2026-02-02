@@ -1,7 +1,8 @@
-import { createContext, useContext, useReducer, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useState, useRef, type ReactNode } from 'react';
 import type { AppState, AppAction, WhatIfAdjustments } from '../types';
 import { DEFAULT_STATE, DEFAULT_WHAT_IF, STORAGE_KEY } from '../constants/defaults';
 import { isLegacyAssetFormat, migrateLegacyAssets } from '../utils/migration';
+import { calculateAchievableFIAge } from '../utils/calculations';
 
 interface AppContextType {
   state: AppState;
@@ -172,6 +173,40 @@ interface AppProviderProps {
 export function AppProvider({ children }: AppProviderProps) {
   const [state, dispatch] = useReducer(appReducer, undefined, loadInitialState);
   const [whatIf, setWhatIf] = useState<WhatIfAdjustments>(DEFAULT_WHAT_IF);
+  const lastCalculatedFIAge = useRef<number | null>(null);
+
+  // Extract values for dependency tracking
+  const { assets, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
+  const { currentAge, lifeExpectancy, filingStatus, spouseAge, state: profileState, targetFIAge } = profile;
+
+  // Sync targetFIAge with calculated achievable FI age
+  useEffect(() => {
+    const result = calculateAchievableFIAge(state, whatIf);
+    const newFIAge = result.achievableFIAge ?? lifeExpectancy - 1;
+
+    // Only update if the calculated age is different from last time
+    if (lastCalculatedFIAge.current !== newFIAge && targetFIAge !== newFIAge) {
+      lastCalculatedFIAge.current = newFIAge;
+      dispatch({
+        type: 'UPDATE_PROFILE',
+        payload: { targetFIAge: newFIAge },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    assets,
+    expenses,
+    socialSecurity,
+    assumptions,
+    lifeEvents,
+    currentAge,
+    lifeExpectancy,
+    filingStatus,
+    spouseAge,
+    profileState,
+    targetFIAge,
+    whatIf,
+  ]);
 
   // Persist state to localStorage
   useEffect(() => {

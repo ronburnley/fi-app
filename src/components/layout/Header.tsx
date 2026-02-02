@@ -1,11 +1,18 @@
 import { useRef } from 'react';
-import { Button } from '../ui';
+import { Button, FIStatusIndicator } from '../ui';
 import { useApp } from '../../context/AppContext';
+import { useWizard } from '../wizard/WizardContext';
+import { useAchievableFI } from '../../hooks/useAchievableFI';
 import { exportState, importState } from '../../utils/exportImport';
 
 export function Header() {
   const { state, dispatch } = useApp();
+  const { currentStep } = useWizard();
+  const achievableFI = useAchievableFI();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Show indicator after step 1 (once user has entered assets in step 2+)
+  const showIndicator = currentStep >= 2;
 
   const handleExport = () => {
     exportState(state);
@@ -33,8 +40,9 @@ export function Header() {
   };
 
   return (
-    <header className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-bg-secondary">
-      <div className="flex items-center gap-3">
+    <header className="header-with-fi-indicator">
+      {/* Left: Logo */}
+      <div className="header-left">
         <div className="w-8 h-8 rounded-lg bg-accent-primary flex items-center justify-center">
           <svg
             className="w-5 h-5 text-white"
@@ -55,7 +63,13 @@ export function Header() {
         </h1>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Center: FI Status Indicator */}
+      <div className="header-center">
+        <FIStatusIndicator result={achievableFI} isVisible={showIndicator} />
+      </div>
+
+      {/* Right: Import/Export */}
+      <div className="header-right">
         <input
           ref={fileInputRef}
           type="file"

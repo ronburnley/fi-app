@@ -37,7 +37,7 @@ export function ChartView() {
     total: Math.max(0, p.taxableBalance + p.traditionalBalance + p.rothBalance + p.hsaBalance + p.cashBalance),
   }));
 
-  const effectiveFIAge = state.profile.targetFIAge + (whatIf?.fiAgeAdjustment || 0);
+  const effectiveFIAge = state.profile.targetFIAge;
   const effectiveSSAge = whatIf?.ssStartAge ?? state.socialSecurity.startAge;
 
   const formatYAxis = (value: number) => {

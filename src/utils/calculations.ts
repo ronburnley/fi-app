@@ -8,6 +8,7 @@ import type {
   AccountOwner,
   PenaltySettings,
   StateTaxInfo,
+  AchievableFIResult,
 } from '../types';
 import { PENALTY_FREE_AGES } from '../constants/defaults';
 import { getStateTaxInfo } from '../constants/stateTaxes';
@@ -478,7 +479,7 @@ export function calculateProjection(
 
   // Apply what-if adjustments
   const effectiveSpending = state.expenses.annualSpending * (1 + (whatIf?.spendingAdjustment || 0));
-  const effectiveFIAge = state.profile.targetFIAge + (whatIf?.fiAgeAdjustment || 0);
+  const effectiveFIAge = state.profile.targetFIAge;
   const effectiveReturn = whatIf?.returnAdjustment ?? state.assumptions.investmentReturn;
   const effectiveSSAge = whatIf?.ssStartAge ?? state.socialSecurity.startAge;
 
@@ -655,4 +656,133 @@ export function calculateSummary(
 
 export function calculateFINumber(annualSpending: number, swr: number): number {
   return annualSpending / swr;
+}
+
+/**
+ * Test if a given FI age is viable (no shortfall before life expectancy)
+ */
+function testFIAge(
+  state: AppState,
+  fiAge: number,
+  whatIf?: WhatIfAdjustments
+): boolean {
+  // Create a modified state with the test FI age
+  const testState: AppState = {
+    ...state,
+    profile: {
+      ...state.profile,
+      targetFIAge: fiAge,
+    },
+  };
+
+  // Run projection with what-if adjustments (but no FI age adjustment)
+  const projections = calculateProjection(testState, whatIf);
+
+  // Check if any year has a shortfall
+  return !projections.some((p) => p.isShortfall);
+}
+
+/**
+ * Calculate the earliest achievable FI age using binary search
+ */
+export function calculateAchievableFIAge(
+  state: AppState,
+  whatIf?: WhatIfAdjustments
+): AchievableFIResult {
+  const { currentAge, lifeExpectancy } = state.profile;
+
+  // First, test if already FI at current age
+  if (testFIAge(state, currentAge, whatIf)) {
+    // Calculate buffer by finding how long money lasts past life expectancy
+    const testState: AppState = {
+      ...state,
+      profile: {
+        ...state.profile,
+        targetFIAge: currentAge,
+        lifeExpectancy: 120, // Extend to find true runway
+      },
+    };
+    const projections = calculateProjection(testState, whatIf);
+    const shortfallYear = projections.find((p) => p.isShortfall);
+    const runwayAge = shortfallYear ? shortfallYear.age - 1 : 120;
+    const bufferYears = runwayAge - lifeExpectancy;
+
+    let confidenceLevel: AchievableFIResult['confidenceLevel'];
+    if (bufferYears >= 10) {
+      confidenceLevel = 'high';
+    } else if (bufferYears >= 5) {
+      confidenceLevel = 'moderate';
+    } else {
+      confidenceLevel = 'tight';
+    }
+
+    return {
+      achievableFIAge: currentAge,
+      confidenceLevel,
+      bufferYears,
+      yearsUntilFI: 0,
+      fiAtCurrentAge: true,
+    };
+  }
+
+  // Test if FI is ever achievable (test at life expectancy - 1)
+  if (!testFIAge(state, lifeExpectancy - 1, whatIf)) {
+    return {
+      achievableFIAge: null,
+      confidenceLevel: 'not_achievable',
+      bufferYears: 0,
+      yearsUntilFI: null,
+      fiAtCurrentAge: false,
+    };
+  }
+
+  // Binary search for earliest viable FI age
+  let low = currentAge;
+  let high = lifeExpectancy - 1;
+
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+
+    if (testFIAge(state, mid, whatIf)) {
+      // This age works, try earlier
+      high = mid;
+    } else {
+      // This age doesn't work, try later
+      low = mid + 1;
+    }
+  }
+
+  const achievableFIAge = low;
+  const yearsUntilFI = achievableFIAge - currentAge;
+
+  // Calculate buffer for the achievable age
+  const testState: AppState = {
+    ...state,
+    profile: {
+      ...state.profile,
+      targetFIAge: achievableFIAge,
+      lifeExpectancy: 120, // Extend to find true runway
+    },
+  };
+  const projections = calculateProjection(testState, whatIf);
+  const shortfallYear = projections.find((p) => p.isShortfall);
+  const runwayAge = shortfallYear ? shortfallYear.age - 1 : 120;
+  const bufferYears = runwayAge - lifeExpectancy;
+
+  let confidenceLevel: AchievableFIResult['confidenceLevel'];
+  if (bufferYears >= 10) {
+    confidenceLevel = 'high';
+  } else if (bufferYears >= 5) {
+    confidenceLevel = 'moderate';
+  } else {
+    confidenceLevel = 'tight';
+  }
+
+  return {
+    achievableFIAge,
+    confidenceLevel,
+    bufferYears,
+    yearsUntilFI,
+    fiAtCurrentAge: false,
+  };
 }

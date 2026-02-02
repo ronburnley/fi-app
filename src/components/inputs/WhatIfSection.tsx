@@ -1,17 +1,14 @@
 import { Card, Slider, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
+import { useAchievableFI } from '../../hooks/useAchievableFI';
 
 export function WhatIfSection() {
   const { state, whatIf, setWhatIf } = useApp();
+  const achievableFI = useAchievableFI();
 
   const formatSpendingAdjustment = (value: number) => {
     const sign = value >= 0 ? '+' : '';
     return `${sign}${(value * 100).toFixed(0)}%`;
-  };
-
-  const formatFIAgeAdjustment = (value: number) => {
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value} years`;
   };
 
   const formatReturn = (value: number) => {
@@ -22,7 +19,7 @@ export function WhatIfSection() {
     <Card title="What-If Scenarios">
       <div className="space-y-5">
         <p className="text-xs text-text-muted">
-          Adjust these sliders to see how changes affect your runway
+          Adjust these sliders to see how changes affect your FI timeline
         </p>
 
         <Slider
@@ -33,16 +30,6 @@ export function WhatIfSection() {
           max={0.3}
           step={0.01}
           formatValue={formatSpendingAdjustment}
-        />
-
-        <Slider
-          label="FI Age Adjustment"
-          value={whatIf.fiAgeAdjustment}
-          onChange={(value) => setWhatIf({ ...whatIf, fiAgeAdjustment: value })}
-          min={-10}
-          max={10}
-          step={1}
-          formatValue={formatFIAgeAdjustment}
         />
 
         <Slider
@@ -82,7 +69,7 @@ export function WhatIfSection() {
         {/* Show effective values */}
         <div className="pt-3 border-t border-border-subtle">
           <p className="text-xs text-text-muted mb-2">Effective Values</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="space-y-1 text-xs">
             <div>
               <span className="text-text-muted">Spending: </span>
               <span className="text-text-primary tabular-nums">
@@ -90,9 +77,11 @@ export function WhatIfSection() {
               </span>
             </div>
             <div>
-              <span className="text-text-muted">FI Age: </span>
+              <span className="text-text-muted">Achievable FI: </span>
               <span className="text-text-primary tabular-nums">
-                {state.profile.targetFIAge + whatIf.fiAgeAdjustment}
+                {achievableFI.achievableFIAge !== null
+                  ? `Age ${achievableFI.achievableFIAge} (${achievableFI.yearsUntilFI} yrs)`
+                  : 'Not achievable'}
               </span>
             </div>
           </div>

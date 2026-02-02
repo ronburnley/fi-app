@@ -4,11 +4,11 @@ import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/formatters';
 
 export function TableView() {
-  const { state, whatIf } = useApp();
+  const { state } = useApp();
   const { projections } = useProjection();
   const [showAllYears, setShowAllYears] = useState(false);
 
-  const effectiveFIAge = state.profile.targetFIAge + (whatIf?.fiAgeAdjustment || 0);
+  const effectiveFIAge = state.profile.targetFIAge;
 
   // Filter to show only FI years by default, or all years if toggled
   const displayProjections = showAllYears
