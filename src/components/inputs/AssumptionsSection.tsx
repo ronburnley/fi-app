@@ -26,25 +26,26 @@ export function AssumptionsSection() {
   };
 
   return (
-    <Card title="Assumptions" collapsible defaultCollapsed>
+    <Card title="Assumptions">
       <div className="space-y-4">
-        <PercentInput
-          label="Investment Return"
-          value={assumptions.investmentReturn}
-          onChange={(value) => updateAssumptions('investmentReturn', value)}
-          hint="Expected annual return (before inflation)"
-          min={-20}
-          max={20}
-        />
-
-        <PercentInput
-          label="Inflation Rate"
-          value={assumptions.inflationRate}
-          onChange={(value) => updateAssumptions('inflationRate', value)}
-          hint="Expected annual inflation"
-          min={0}
-          max={15}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <PercentInput
+            label="Investment Return"
+            value={assumptions.investmentReturn}
+            onChange={(value) => updateAssumptions('investmentReturn', value)}
+            hint="Annual return (before inflation)"
+            min={-20}
+            max={20}
+          />
+          <PercentInput
+            label="Inflation Rate"
+            value={assumptions.inflationRate}
+            onChange={(value) => updateAssumptions('inflationRate', value)}
+            hint="Annual inflation"
+            min={0}
+            max={15}
+          />
+        </div>
 
         <div className="pt-3 border-t border-border-subtle">
           <p className="text-xs text-text-muted mb-3">Tax Rates on Withdrawals</p>
@@ -68,35 +69,33 @@ export function AssumptionsSection() {
 
         <div className="pt-3 border-t border-border-subtle">
           <p className="text-xs text-text-muted mb-3">Early Withdrawal Penalties</p>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <PercentInput
-                label="Before Age 59.5"
-                value={assumptions.penaltySettings.earlyWithdrawalPenaltyRate}
-                onChange={(value) => updatePenaltySettings('earlyWithdrawalPenaltyRate', value)}
-                hint="Traditional/Roth penalty"
-                min={0}
-                max={25}
-              />
-              <PercentInput
-                label="HSA Before 65"
-                value={assumptions.penaltySettings.hsaEarlyPenaltyRate}
-                onChange={(value) => updatePenaltySettings('hsaEarlyPenaltyRate', value)}
-                hint="Non-medical use"
-                min={0}
-                max={30}
-              />
-            </div>
-            <div className="pt-2">
-              <Toggle
-                label="Enable Rule of 55"
-                checked={assumptions.penaltySettings.enableRule55}
-                onChange={(value) => updatePenaltySettings('enableRule55', value)}
-              />
-              <p className="text-xs text-text-muted mt-1">
-                Allows penalty-free 401(k) withdrawals after leaving employer at 55+
-              </p>
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <PercentInput
+              label="Before Age 59.5"
+              value={assumptions.penaltySettings.earlyWithdrawalPenaltyRate}
+              onChange={(value) => updatePenaltySettings('earlyWithdrawalPenaltyRate', value)}
+              hint="Traditional/Roth penalty"
+              min={0}
+              max={25}
+            />
+            <PercentInput
+              label="HSA Before 65"
+              value={assumptions.penaltySettings.hsaEarlyPenaltyRate}
+              onChange={(value) => updatePenaltySettings('hsaEarlyPenaltyRate', value)}
+              hint="Non-medical use"
+              min={0}
+              max={30}
+            />
+          </div>
+          <div className="mt-3">
+            <Toggle
+              label="Enable Rule of 55"
+              checked={assumptions.penaltySettings.enableRule55}
+              onChange={(value) => updatePenaltySettings('enableRule55', value)}
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Allows penalty-free 401(k) withdrawals after leaving employer at 55+
+            </p>
           </div>
         </div>
 
