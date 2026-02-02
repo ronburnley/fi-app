@@ -4,7 +4,7 @@ import { WizardNavigation } from '../WizardNavigation';
 
 export function ResultsStep() {
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-[1600px] mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-semibold text-text-primary mb-2">
           Your FI Runway
@@ -14,15 +14,19 @@ export function ResultsStep() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-6">
+        <div className="xl:col-span-3 space-y-6">
           <SummaryMetrics />
           <ChartView />
-          <TableView />
         </div>
-        <div className="lg:col-span-1">
+        <div className="xl:col-span-1">
           <WhatIfSection />
         </div>
+      </div>
+
+      {/* Table gets full width */}
+      <div className="mb-6">
+        <TableView />
       </div>
 
       <WizardNavigation />

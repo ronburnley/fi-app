@@ -31,37 +31,37 @@ export function TableView() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-bg-tertiary">
-              <th className="sticky left-0 bg-bg-tertiary px-3 py-2 text-left text-xs font-medium text-text-muted">
+              <th className="sticky left-0 bg-bg-tertiary px-4 py-2 text-left text-xs font-medium text-text-muted">
                 Age
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Expenses
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Income
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Gap
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Withdrawal
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Penalty
               </th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-left text-xs font-medium text-text-muted whitespace-nowrap">
                 Source
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Taxable
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Traditional
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Roth
               </th>
-              <th className="px-3 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Net Worth
               </th>
             </tr>
@@ -81,7 +81,7 @@ export function TableView() {
                     ${projection.isShortfall ? 'bg-accent-danger/10' : ''}
                   `}
                 >
-                  <td className="sticky left-0 px-3 py-2 font-medium text-text-primary tabular-nums whitespace-nowrap bg-inherit">
+                  <td className="sticky left-0 px-4 py-2 font-medium text-text-primary tabular-nums whitespace-nowrap bg-inherit">
                     <div className="flex items-center gap-2">
                       <span>{projection.age}</span>
                       {isCurrentAge && (
@@ -98,39 +98,39 @@ export function TableView() {
                       )}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.expenses > 0 ? formatCurrency(projection.expenses) : '-'}
                   </td>
-                  <td className="px-3 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.income > 0 ? formatCurrency(projection.income) : '-'}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                     <span className={projection.gap > 0 ? 'text-text-secondary' : 'text-text-muted'}>
                       {projection.gap > 0 ? formatCurrency(projection.gap) : '-'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.withdrawal > 0 ? formatCurrency(projection.withdrawal) : '-'}
                   </td>
-                  <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                     <span className={projection.withdrawalPenalty > 0 ? 'text-accent-warning font-medium' : 'text-text-muted'}>
                       {projection.withdrawalPenalty > 0 ? formatCurrency(projection.withdrawalPenalty) : '-'}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-left text-text-muted text-xs whitespace-nowrap">
+                  <td className="px-4 py-2 text-left text-text-muted text-xs whitespace-nowrap">
                     {projection.withdrawal > 0 ? projection.withdrawalSource : '-'}
                   </td>
-                  <td className="px-3 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {formatCurrency(projection.taxableBalance)}
                   </td>
-                  <td className="px-3 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {formatCurrency(projection.traditionalBalance)}
                   </td>
-                  <td className="px-3 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {formatCurrency(projection.rothBalance)}
                   </td>
                   <td
-                    className={`px-3 py-2 text-right font-medium tabular-nums whitespace-nowrap ${
+                    className={`px-4 py-2 text-right font-medium tabular-nums whitespace-nowrap ${
                       projection.isShortfall ? 'text-accent-danger' : 'text-text-primary'
                     }`}
                   >
