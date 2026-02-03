@@ -112,6 +112,7 @@ interface Assets {
   pension?: {
     annualBenefit: number;
     startAge: number;
+    colaRate?: number;         // Optional COLA rate (decimal, e.g., 0.02 = 2%)
   };
 }
 ```
@@ -651,6 +652,27 @@ When building this app:
 ---
 
 ## Changelog
+
+### v4.1 - 2026-02-03 - Pension Input with COLA Support
+
+**New Features:**
+- Pension input fields now appear inline on Assets step when toggle is enabled
+- Added COLA (Cost-of-Living Adjustment) support for pensions
+- Collapsible "Advanced" section for COLA rate input
+
+**Data Model Changes:**
+- Added optional `colaRate` to Pension interface (stored as decimal, e.g., 0.02 = 2%)
+
+**UI Changes:**
+- Removed "We'll ask for details on the next step" message
+- Pension inputs (Annual Benefit, Start Age) now appear immediately when toggle is ON
+- Added "Advanced" collapsible section with COLA percentage input
+- Added helpful hint text: "Before taxes", "When payments begin", "Cost-of-living adjustment"
+- Consistent pension UI in both wizard (AssetsStep) and 2-panel layout (AssetsSection)
+
+**Calculation Changes:**
+- Pension income now compounds with COLA from pension start year (matches SS pattern)
+- Formula: `annualBenefit * (1 + colaRate)^yearsSincePensionStart`
 
 ### v4.0 - 2026-02-02 - Inverted FI Model (Calculated FI Age)
 

@@ -530,9 +530,12 @@ export function calculateProjection(
       }
     }
 
-    // Pension
+    // Pension with optional COLA
     if (assets.pension && age >= assets.pension.startAge) {
-      income += assets.pension.annualBenefit;
+      const yearsSincePensionStart = age - assets.pension.startAge;
+      const pensionColaRate = assets.pension.colaRate ?? 0;
+      const pensionColaFactor = Math.pow(1 + pensionColaRate, yearsSincePensionStart);
+      income += assets.pension.annualBenefit * pensionColaFactor;
     }
 
     // Calculate gap (expenses + life events - income)
@@ -716,26 +719,36 @@ export function calculateFINumber(annualSpending: number, swr: number): number {
 }
 
 /**
- * Test if a given FI age is viable (no shortfall before life expectancy)
+ * Test if a given FI age is viable (no shortfall before life expectancy + buffer)
+ *
+ * The viability test requires money to last MINIMUM_BUFFER_YEARS beyond life expectancy.
+ * This ensures that large expenses (like life events) that reduce the buffer will
+ * appropriately push the achievable FI age later.
  */
 function testFIAge(
   state: AppState,
   fiAge: number,
   whatIf?: WhatIfAdjustments
 ): boolean {
-  // Create a modified state with the test FI age
+  // Extend life expectancy by buffer years to ensure adequate margin
+  // This means an FI age is only viable if money lasts 5 years PAST planning horizon
+  const MINIMUM_BUFFER_YEARS = 5;
+  const extendedLifeExpectancy = state.profile.lifeExpectancy + MINIMUM_BUFFER_YEARS;
+
+  // Create a modified state with the test FI age and extended life expectancy
   const testState: AppState = {
     ...state,
     profile: {
       ...state.profile,
       targetFIAge: fiAge,
+      lifeExpectancy: extendedLifeExpectancy, // Test beyond life expectancy
     },
   };
 
   // Run projection with what-if adjustments (but no FI age adjustment)
   const projections = calculateProjection(testState, whatIf);
 
-  // Check if any year has a shortfall
+  // Check if any year has a shortfall (now tests to lifeExpectancy + 5)
   return !projections.some((p) => p.isShortfall);
 }
 

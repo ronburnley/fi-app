@@ -18,6 +18,7 @@ export interface StateTaxInfo {
 export interface Pension {
   annualBenefit: number;
   startAge: number;
+  colaRate?: number;  // Optional COLA rate, stored as decimal (0.02 = 2%)
 }
 
 // v3: Flexible asset types

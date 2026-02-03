@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { AssetEditForm } from '../../inputs/AssetEditForm';
-import { CurrencyInput, Toggle } from '../../ui';
+import { CurrencyInput, Toggle, Input, PercentInput } from '../../ui';
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS } from '../../../constants/defaults';
 import type { Asset } from '../../../types';
 
@@ -21,6 +21,7 @@ export function AssetsStep() {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [hasPension, setHasPension] = useState(!!assets.pension);
+  const [showPensionAdvanced, setShowPensionAdvanced] = useState(false);
 
   const isMarried = profile.filingStatus === 'married';
 
@@ -49,7 +50,7 @@ export function AssetsStep() {
       dispatch({
         type: 'UPDATE_ASSETS',
         payload: {
-          pension: { annualBenefit: 0, startAge: 65 },
+          pension: { annualBenefit: 0, startAge: 65, colaRate: 0 },
         },
       });
     } else {
@@ -58,6 +59,18 @@ export function AssetsStep() {
         payload: { pension: undefined },
       });
     }
+  };
+
+  const updatePension = (field: string, value: number) => {
+    dispatch({
+      type: 'UPDATE_ASSETS',
+      payload: {
+        pension: {
+          ...assets.pension!,
+          [field]: value,
+        },
+      },
+    });
   };
 
   const updateHomeEquity = (value: number) => {
@@ -194,17 +207,74 @@ export function AssetsStep() {
             hint="For reference only, not included in withdrawals"
           />
 
-          {/* Pension Toggle */}
+          {/* Pension Toggle + Inline Details */}
           <div className="pt-2 border-t border-border-subtle">
             <Toggle
               label="Have a pension?"
               checked={hasPension}
               onChange={togglePension}
             />
-            {hasPension && (
-              <p className="text-xs text-text-muted mt-2">
-                We'll ask for details on the next step.
-              </p>
+
+            {hasPension && assets.pension && (
+              <div className="mt-4 space-y-4">
+                {/* Primary Inputs: 2-column grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  <CurrencyInput
+                    label="Annual Benefit"
+                    value={assets.pension.annualBenefit}
+                    onChange={(value) => updatePension('annualBenefit', value)}
+                    hint="Before taxes"
+                  />
+                  <Input
+                    label="Start Age"
+                    type="number"
+                    value={assets.pension.startAge}
+                    onChange={(e) => updatePension('startAge', parseInt(e.target.value) || 65)}
+                    min={50}
+                    max={100}
+                    hint="When payments begin"
+                  />
+                </div>
+
+                {/* Advanced Settings - COLA */}
+                <div className="pt-3 border-t border-border-subtle/50">
+                  <button
+                    type="button"
+                    onClick={() => setShowPensionAdvanced(!showPensionAdvanced)}
+                    className="group flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
+                  >
+                    <svg
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                        showPensionAdvanced ? 'rotate-90' : ''
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                    <span className="font-medium">Advanced</span>
+                  </button>
+
+                  {showPensionAdvanced && (
+                    <div className="mt-3 max-w-[200px]">
+                      <PercentInput
+                        label="Annual COLA"
+                        value={assets.pension.colaRate ?? 0}
+                        onChange={(value) => updatePension('colaRate', value)}
+                        hint="Cost-of-living adjustment"
+                        min={0}
+                        max={10}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
