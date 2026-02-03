@@ -3,6 +3,7 @@ import { WizardProgress } from './WizardProgress';
 import {
   WelcomeStep,
   AssetsStep,
+  IncomeStep,
   SpendingStep,
   BenefitsStep,
   LifeEventsStep,
@@ -13,6 +14,7 @@ import {
 const STEPS = [
   WelcomeStep,
   AssetsStep,
+  IncomeStep,
   SpendingStep,
   BenefitsStep,
   LifeEventsStep,

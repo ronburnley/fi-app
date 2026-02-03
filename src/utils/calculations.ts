@@ -11,6 +11,9 @@ import type {
   AchievableFIResult,
   Expenses,
   MortgageDetails,
+  FinancialPhase,
+  EmploymentIncome,
+  RetirementIncome,
 } from '../types';
 import { PENALTY_FREE_AGES } from '../constants/defaults';
 import { getStateTaxInfo } from '../constants/stateTaxes';
@@ -597,6 +600,220 @@ function growAssetBalances(
   return newMap;
 }
 
+// ==================== Income/Phase Helpers ====================
+
+/**
+ * Determine the financial phase for a given year
+ * - 'working': Still employed (age < employment end age)
+ * - 'gap': Retired from work but before FI (bridging period)
+ * - 'fi': At or past FI age
+ */
+function determinePhase(
+  selfAge: number,
+  spouseAge: number | undefined,
+  selfEmployment: EmploymentIncome | undefined,
+  spouseEmployment: EmploymentIncome | undefined,
+  fiAge: number
+): FinancialPhase {
+  // Check if either person is still working
+  const selfWorking = selfEmployment && selfAge < selfEmployment.endAge;
+  const spouseWorking = spouseEmployment && spouseAge !== undefined && spouseAge < spouseEmployment.endAge;
+
+  if (selfWorking || spouseWorking) {
+    return 'working';
+  }
+
+  // Not working - check if at FI age
+  if (selfAge >= fiAge) {
+    return 'fi';
+  }
+
+  // In the gap between retirement and FI
+  return 'gap';
+}
+
+interface EmploymentIncomeResult {
+  grossIncome: number;
+  netIncome: number;
+  tax: number;
+  contributions: number;
+}
+
+/**
+ * Calculate total employment income for a given year
+ * Returns gross, net (after tax and contributions), tax, and contribution amounts
+ */
+function calculateEmploymentIncome(
+  selfAge: number,
+  spouseAge: number | undefined,
+  selfEmployment: EmploymentIncome | undefined,
+  spouseEmployment: EmploymentIncome | undefined,
+  filingStatus: 'single' | 'married'
+): EmploymentIncomeResult {
+  let grossIncome = 0;
+  let contributions = 0;
+  let tax = 0;
+
+  // Self employment income
+  if (selfEmployment && selfAge < selfEmployment.endAge) {
+    grossIncome += selfEmployment.annualGrossIncome;
+    contributions += selfEmployment.annualContributions;
+    tax += selfEmployment.annualGrossIncome * selfEmployment.effectiveTaxRate;
+  }
+
+  // Spouse employment income
+  if (filingStatus === 'married' && spouseEmployment && spouseAge !== undefined && spouseAge < spouseEmployment.endAge) {
+    grossIncome += spouseEmployment.annualGrossIncome;
+    contributions += spouseEmployment.annualContributions;
+    tax += spouseEmployment.annualGrossIncome * spouseEmployment.effectiveTaxRate;
+  }
+
+  // Net = gross - tax - contributions (contributions go to accounts, not spending)
+  const netIncome = grossIncome - tax - contributions;
+
+  return {
+    grossIncome,
+    netIncome,
+    tax,
+    contributions,
+  };
+}
+
+/**
+ * Add contributions to matching accounts based on type
+ * Distributes contributions proportionally to existing traditional/roth/HSA accounts
+ */
+function addContributionsToAccounts(
+  assetBalanceMap: Map<string, { balance: number; costBasis?: number }>,
+  assets: Asset[],
+  contributions: number
+): Map<string, { balance: number; costBasis?: number }> {
+  if (contributions <= 0) return assetBalanceMap;
+
+  const newMap = new Map(assetBalanceMap);
+
+  // Find retirement accounts (traditional, roth, hsa)
+  const retirementAccounts = assets.filter(
+    (a) => a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa'
+  );
+
+  if (retirementAccounts.length === 0) {
+    // No retirement accounts - add to taxable or cash
+    const taxableAccount = assets.find((a) => a.type === 'taxable');
+    const cashAccount = assets.find((a) => a.type === 'cash');
+    const targetAccount = taxableAccount || cashAccount;
+
+    if (targetAccount) {
+      const balanceInfo = newMap.get(targetAccount.id);
+      if (balanceInfo) {
+        newMap.set(targetAccount.id, {
+          ...balanceInfo,
+          balance: balanceInfo.balance + contributions,
+        });
+      }
+    }
+    return newMap;
+  }
+
+  // Get total balance of retirement accounts for proportional distribution
+  const totalRetirementBalance = retirementAccounts.reduce((sum, a) => {
+    const info = assetBalanceMap.get(a.id);
+    return sum + (info?.balance ?? 0);
+  }, 0);
+
+  if (totalRetirementBalance === 0) {
+    // All accounts empty - split evenly
+    const perAccount = contributions / retirementAccounts.length;
+    for (const account of retirementAccounts) {
+      const balanceInfo = newMap.get(account.id);
+      if (balanceInfo) {
+        newMap.set(account.id, {
+          ...balanceInfo,
+          balance: balanceInfo.balance + perAccount,
+        });
+      }
+    }
+  } else {
+    // Distribute proportionally based on existing balances
+    for (const account of retirementAccounts) {
+      const balanceInfo = newMap.get(account.id);
+      if (balanceInfo) {
+        const proportion = balanceInfo.balance / totalRetirementBalance;
+        const contributionAmount = contributions * proportion;
+        newMap.set(account.id, {
+          ...balanceInfo,
+          balance: balanceInfo.balance + contributionAmount,
+        });
+      }
+    }
+  }
+
+  return newMap;
+}
+
+/**
+ * Calculate total retirement income streams (excluding SS and pension)
+ */
+function calculateRetirementIncomeStreams(
+  retirementIncomes: RetirementIncome[],
+  age: number,
+  yearsSinceFI: number,
+  inflationRate: number
+): number {
+  let total = 0;
+
+  for (const ri of retirementIncomes) {
+    // Check if income is active at this age
+    if (age < ri.startAge) continue;
+    if (ri.endAge !== undefined && age > ri.endAge) continue;
+
+    let amount = ri.annualAmount;
+
+    // Apply inflation adjustment if enabled
+    if (ri.inflationAdjusted && yearsSinceFI > 0) {
+      amount *= Math.pow(1 + inflationRate, yearsSinceFI);
+    }
+
+    total += amount;
+  }
+
+  return total;
+}
+
+/**
+ * Add surplus income to taxable account (or cash if no taxable account)
+ */
+function addSurplusToAccounts(
+  assetBalanceMap: Map<string, { balance: number; costBasis?: number }>,
+  assets: Asset[],
+  surplus: number
+): Map<string, { balance: number; costBasis?: number }> {
+  if (surplus <= 0) return assetBalanceMap;
+
+  const newMap = new Map(assetBalanceMap);
+
+  // Prefer taxable account for surplus
+  const taxableAccount = assets.find((a) => a.type === 'taxable');
+  const cashAccount = assets.find((a) => a.type === 'cash');
+  const targetAccount = taxableAccount || cashAccount;
+
+  if (targetAccount) {
+    const balanceInfo = newMap.get(targetAccount.id);
+    if (balanceInfo) {
+      newMap.set(targetAccount.id, {
+        ...balanceInfo,
+        balance: balanceInfo.balance + surplus,
+        // For taxable, surplus is all cost basis (no unrealized gains yet)
+        costBasis: targetAccount.type === 'taxable'
+          ? (balanceInfo.costBasis ?? 0) + surplus
+          : balanceInfo.costBasis,
+      });
+    }
+  }
+
+  return newMap;
+}
+
 interface YearExpenseResult {
   totalExpenses: number;
   mortgageBalance: number | undefined;
@@ -747,20 +964,37 @@ export function calculateProjection(
   let balances = aggregateBalances(state.assets.accounts);
   let assetBalanceMap = createAssetBalanceMap(state.assets.accounts);
 
-  const { assumptions, socialSecurity, lifeEvents, profile, assets } = state;
+  const { assumptions, socialSecurity, lifeEvents, profile, assets, income } = state;
   const penaltySettings = assumptions.penaltySettings;
   const stateTaxInfo = getStateTaxInfo(profile.state);
 
   for (let age = profile.currentAge; age <= profile.lifeExpectancy; age++) {
     const year = currentYear + (age - profile.currentAge);
-    const isInFI = age >= effectiveFIAge;
 
     // Calculate spouse age
     const spouseAge = profile.filingStatus === 'married' && profile.spouseAge
       ? age - (profile.currentAge - profile.spouseAge)
       : undefined;
 
-    // Calculate expenses using new category-based system
+    // Determine financial phase
+    const phase = determinePhase(
+      age,
+      spouseAge,
+      income.employment,
+      income.spouseEmployment,
+      effectiveFIAge
+    );
+
+    // Calculate employment income (only during working phase)
+    const employmentResult = calculateEmploymentIncome(
+      age,
+      spouseAge,
+      income.employment,
+      income.spouseEmployment,
+      profile.filingStatus
+    );
+
+    // Calculate expenses - always needed (even during working years for tracking)
     const expenseResult = calculateYearExpenses(
       state.expenses,
       year,
@@ -771,27 +1005,34 @@ export function calculateProjection(
       spendingMultiplier
     );
 
-    // Only count regular expenses during FI
-    const yearExpenses = isInFI ? expenseResult.totalExpenses : 0;
     const mortgageBalance = expenseResult.mortgageBalance;
 
-    // Mortgage payoff amount if applicable (this is an additional expense for the payoff year)
-    const mortgagePayoffExpense = isInFI && expenseResult.mortgagePayoffAmount
-      ? expenseResult.mortgagePayoffAmount
-      : 0;
+    // Mortgage payoff amount if applicable
+    const mortgagePayoffExpense = expenseResult.mortgagePayoffAmount ?? 0;
 
     // Add life events for this year
     const yearLifeEvents = lifeEvents.filter((e) => e.year === year);
     const lifeEventTotal = yearLifeEvents.reduce((sum, e) => sum + e.amount, 0);
 
-    // Calculate income
-    let income = 0;
+    // Calculate years since FI (for inflation on retirement income)
+    const yearsSinceFI = Math.max(0, age - effectiveFIAge);
+
+    // Calculate retirement income streams (consulting, rentals, etc.)
+    const retirementIncomeStreams = calculateRetirementIncomeStreams(
+      income.retirementIncomes,
+      age,
+      yearsSinceFI,
+      assumptions.inflationRate
+    );
+
+    // Calculate passive income (SS, pension)
+    let passiveIncome = 0;
 
     // Primary Social Security with COLA
     if (socialSecurity.include && age >= effectiveSSAge) {
       const yearsSinceStart = age - effectiveSSAge;
       const colaFactor = Math.pow(1 + (socialSecurity.colaRate || 0), yearsSinceStart);
-      income += socialSecurity.monthlyBenefit * 12 * colaFactor;
+      passiveIncome += socialSecurity.monthlyBenefit * 12 * colaFactor;
     }
 
     // Spouse Social Security with COLA
@@ -801,7 +1042,7 @@ export function calculateProjection(
       if (spouseAge >= spouseSSAge) {
         const yearsSinceStart = spouseAge - spouseSSAge;
         const colaFactor = Math.pow(1 + (socialSecurity.colaRate || 0), yearsSinceStart);
-        income += socialSecurity.spouse.monthlyBenefit * 12 * colaFactor;
+        passiveIncome += socialSecurity.spouse.monthlyBenefit * 12 * colaFactor;
       }
     }
 
@@ -810,35 +1051,62 @@ export function calculateProjection(
       const yearsSincePensionStart = age - assets.pension.startAge;
       const pensionColaRate = assets.pension.colaRate ?? 0;
       const pensionColaFactor = Math.pow(1 + pensionColaRate, yearsSincePensionStart);
-      income += assets.pension.annualBenefit * pensionColaFactor;
+      passiveIncome += assets.pension.annualBenefit * pensionColaFactor;
     }
 
-    // Calculate gap (expenses + life events + mortgage payoff - income)
-    // Life events: positive = expense, negative = income
-    const totalExpenses = yearExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
-    const totalIncome = income + Math.abs(Math.min(0, lifeEventTotal));
+    // Total non-employment income (SS + pension + retirement income streams)
+    const totalPassiveIncome = passiveIncome + retirementIncomeStreams;
 
-    // During FI: gap covers regular expenses + life events
-    // Before FI: only life events affect portfolio (regular expenses covered by salary)
-    const fiGap = isInFI ? Math.max(0, totalExpenses - totalIncome) : 0;
-
-    // Life events during working years still affect portfolio directly
-    // Positive = expense (withdraw from portfolio), Negative = income (add to portfolio)
-    const preFILifeEventImpact = !isInFI ? lifeEventTotal : 0;
-
-    // Withdraw from accounts if in FI
+    // Initialize year tracking variables
     let withdrawal = 0;
     let withdrawalPenalty = 0;
     let federalTax = 0;
     let stateTax = 0;
     let withdrawalSource = 'N/A';
+    let yearExpenses = 0;
+    let totalIncome = 0;
+    let gap = 0;
 
-    // Handle pre-FI life events (direct portfolio adjustment)
-    if (!isInFI && preFILifeEventImpact !== 0) {
-      if (preFILifeEventImpact > 0) {
-        // Expense: withdraw from portfolio
+    if (phase === 'working') {
+      // WORKING PHASE: Employment income covers expenses, contributions grow accounts
+      yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal);
+      totalIncome = employmentResult.netIncome + totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
+
+      // Add contributions to retirement accounts BEFORE calculating surplus
+      if (employmentResult.contributions > 0) {
+        assetBalanceMap = addContributionsToAccounts(
+          assetBalanceMap,
+          assets.accounts,
+          employmentResult.contributions
+        );
+        // Update aggregated balances
+        balances = aggregateBalances(
+          assets.accounts.map((a) => ({
+            ...a,
+            balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
+          }))
+        );
+      }
+
+      // Calculate surplus (net income - expenses)
+      const surplus = totalIncome - yearExpenses;
+
+      if (surplus > 0) {
+        // Positive surplus: add to taxable account
+        assetBalanceMap = addSurplusToAccounts(assetBalanceMap, assets.accounts, surplus);
+        balances = aggregateBalances(
+          assets.accounts.map((a) => ({
+            ...a,
+            balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
+            costBasis: assetBalanceMap.get(a.id)?.costBasis ?? a.costBasis,
+          }))
+        );
+        withdrawalSource = 'Savings';
+      } else if (surplus < 0) {
+        // Negative surplus: need to withdraw from accounts (rare during working years)
+        gap = Math.abs(surplus);
         const result = withdrawFromAccounts(
-          preFILifeEventImpact,
+          gap,
           assets.accounts,
           assetBalanceMap,
           assumptions.withdrawalOrder,
@@ -853,83 +1121,70 @@ export function calculateProjection(
         withdrawalPenalty = result.penalty;
         federalTax = result.federalTax;
         stateTax = result.stateTax;
-        withdrawalSource = result.source + ' (Life Event)';
+        withdrawalSource = result.source;
         balances = result.balances;
         assetBalanceMap = result.assetBalances;
-      } else {
-        // Income: add to portfolio (put in cash for simplicity)
-        const incomeAmount = Math.abs(preFILifeEventImpact);
-        // Find cash account or first taxable account to deposit into
-        for (const asset of assets.accounts) {
-          if (asset.type === 'cash' || asset.type === 'taxable') {
-            const balanceInfo = assetBalanceMap.get(asset.id);
-            if (balanceInfo) {
-              assetBalanceMap.set(asset.id, {
-                ...balanceInfo,
-                balance: balanceInfo.balance + incomeAmount,
-              });
-              balances.cash += asset.type === 'cash' ? incomeAmount : 0;
-              balances.taxable += asset.type === 'taxable' ? incomeAmount : 0;
-              withdrawalSource = 'Life Event Income';
-              break;
-            }
-          }
-        }
+      }
+    } else {
+      // GAP or FI PHASE: No employment income, rely on passive income and withdrawals
+      yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
+      totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
+
+      // Gap is what needs to come from portfolio
+      gap = Math.max(0, yearExpenses - totalIncome);
+
+      if (gap > 0) {
+        const result = withdrawFromAccounts(
+          gap,
+          assets.accounts,
+          assetBalanceMap,
+          assumptions.withdrawalOrder,
+          assumptions.traditionalTaxRate,
+          assumptions.capitalGainsTaxRate,
+          stateTaxInfo,
+          age,
+          spouseAge,
+          penaltySettings
+        );
+        withdrawal = result.amount;
+        withdrawalPenalty = result.penalty;
+        federalTax = result.federalTax;
+        stateTax = result.stateTax;
+        withdrawalSource = result.source;
+        balances = result.balances;
+        assetBalanceMap = result.assetBalances;
+      }
+
+      // Update withdrawal source if mortgage payoff occurred
+      if (mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A') {
+        withdrawalSource = `${withdrawalSource} (+ Mortgage Payoff)`;
+      } else if (mortgagePayoffExpense > 0) {
+        withdrawalSource = 'Mortgage Payoff';
       }
     }
 
-    // Handle FI withdrawals for regular expenses
-    if (isInFI && fiGap > 0) {
-      const result = withdrawFromAccounts(
-        fiGap,
-        assets.accounts,
-        assetBalanceMap,
-        assumptions.withdrawalOrder,
-        assumptions.traditionalTaxRate,
-        assumptions.capitalGainsTaxRate,
-        stateTaxInfo,
-        age,
-        spouseAge,
-        penaltySettings
-      );
-      withdrawal = result.amount;
-      withdrawalPenalty = result.penalty;
-      federalTax = result.federalTax;
-      stateTax = result.stateTax;
-      withdrawalSource = result.source;
-      balances = result.balances;
-      assetBalanceMap = result.assetBalances;
-    }
-
-    // Check for shortfall (can happen during FI or with large pre-FI life events)
+    // Check for shortfall
     const totalBalance = balances.taxable + balances.traditional + balances.roth + balances.hsa + balances.cash;
-    const neededAmount = isInFI ? fiGap : preFILifeEventImpact;
-    const isShortfall = neededAmount > 0 && totalBalance < neededAmount && withdrawal < neededAmount;
+    const isShortfall = gap > 0 && totalBalance < gap && withdrawal < gap;
 
-    // Record this year's projection (liquid assets only, home is now in expenses)
+    // Record this year's projection
     const totalNetWorth = totalBalance;
-
-    // Gap represents what needs to come from portfolio
-    const gap = isInFI ? fiGap : Math.max(0, preFILifeEventImpact);
-
-    // Update withdrawal source if mortgage payoff occurred
-    const finalWithdrawalSource = mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A'
-      ? `${withdrawalSource} (+ Mortgage Payoff)`
-      : mortgagePayoffExpense > 0
-        ? 'Mortgage Payoff'
-        : withdrawalSource;
 
     projections.push({
       year,
       age,
-      expenses: totalExpenses,
+      phase,
+      expenses: yearExpenses,
       income: totalIncome,
+      employmentIncome: employmentResult.netIncome,
+      contributions: employmentResult.contributions,
+      retirementIncome: retirementIncomeStreams,
       gap,
       withdrawal,
       withdrawalPenalty,
       federalTax,
       stateTax,
-      withdrawalSource: finalWithdrawalSource,
+      withdrawalSource,
       taxableBalance: balances.taxable,
       traditionalBalance: balances.traditional,
       rothBalance: balances.roth,

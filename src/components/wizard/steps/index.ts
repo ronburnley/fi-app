@@ -1,5 +1,6 @@
 export { WelcomeStep } from './WelcomeStep';
 export { AssetsStep } from './AssetsStep';
+export { IncomeStep } from './IncomeStep';
 export { SpendingStep } from './SpendingStep';
 export { BenefitsStep } from './BenefitsStep';
 export { LifeEventsStep } from './LifeEventsStep';

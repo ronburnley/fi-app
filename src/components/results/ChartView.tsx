@@ -40,6 +40,10 @@ export function ChartView() {
   const effectiveFIAge = state.profile.targetFIAge;
   const effectiveSSAge = whatIf?.ssStartAge ?? state.socialSecurity.startAge;
 
+  // Employment end ages for reference lines
+  const selfRetirementAge = state.income.employment?.endAge;
+  const spouseRetirementAge = state.income.spouseEmployment?.endAge;
+
   const formatYAxis = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
@@ -117,6 +121,32 @@ export function ChartView() {
             <Tooltip content={<CustomTooltip />} />
 
             {/* Reference lines */}
+            {selfRetirementAge && selfRetirementAge !== effectiveFIAge && (
+              <ReferenceLine
+                x={selfRetirementAge}
+                stroke="#f59e0b"
+                strokeDasharray="4 4"
+                label={{
+                  value: 'Retire',
+                  position: 'top',
+                  fill: '#f59e0b',
+                  fontSize: 10,
+                }}
+              />
+            )}
+            {spouseRetirementAge && spouseRetirementAge !== selfRetirementAge && spouseRetirementAge !== effectiveFIAge && (
+              <ReferenceLine
+                x={spouseRetirementAge}
+                stroke="#f59e0b"
+                strokeDasharray="2 4"
+                label={{
+                  value: 'Spouse',
+                  position: 'top',
+                  fill: '#f59e0b',
+                  fontSize: 10,
+                }}
+              />
+            )}
             <ReferenceLine
               x={effectiveFIAge}
               stroke="#3b82f6"

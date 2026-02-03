@@ -137,6 +137,37 @@ export interface LifeEvent {
   amount: number; // positive = expense, negative = income
 }
 
+// ==================== Income Modeling ====================
+
+// Employment income during working years
+export interface EmploymentIncome {
+  annualGrossIncome: number;      // Pre-tax salary
+  annualContributions: number;    // Total 401k/IRA/HSA contributions
+  endAge: number;                 // Age when employment ends (retirement age)
+  effectiveTaxRate: number;       // Combined fed+state (decimal, e.g., 0.25)
+}
+
+// Retirement income streams beyond SS/pension (consulting, rentals, etc.)
+export interface RetirementIncome {
+  id: string;
+  name: string;                   // "Consulting", "Rental income"
+  annualAmount: number;
+  startAge: number;
+  endAge?: number;                // undefined = perpetual
+  inflationAdjusted: boolean;
+  taxable: boolean;
+}
+
+// Financial phase indicator for each projection year
+export type FinancialPhase = 'working' | 'gap' | 'fi';
+
+// Combined income section
+export interface Income {
+  employment?: EmploymentIncome;
+  spouseEmployment?: EmploymentIncome;
+  retirementIncomes: RetirementIncome[];
+}
+
 export type WithdrawalSource = 'taxable' | 'traditional' | 'roth';
 
 export interface Assumptions {
@@ -153,6 +184,7 @@ export interface Assumptions {
 export interface AppState {
   profile: UserProfile;
   assets: Assets;
+  income: Income;
   socialSecurity: SocialSecurity;
   expenses: Expenses;
   lifeEvents: LifeEvent[];
@@ -162,8 +194,12 @@ export interface AppState {
 export interface YearProjection {
   year: number;
   age: number;
+  phase: FinancialPhase;          // 'working' | 'gap' | 'fi'
   expenses: number;
-  income: number;
+  income: number;                 // SS + pension + retirement income streams
+  employmentIncome: number;       // Net after-tax employment income
+  contributions: number;          // Added to retirement accounts
+  retirementIncome: number;       // Non-SS/pension retirement streams
   gap: number;
   withdrawal: number;
   withdrawalPenalty: number;
@@ -216,6 +252,12 @@ export type AppAction =
   | { type: 'ADD_ASSET'; payload: Asset }
   | { type: 'UPDATE_ASSET'; payload: Asset }
   | { type: 'REMOVE_ASSET'; payload: string }
+  | { type: 'UPDATE_INCOME'; payload: Partial<Income> }
+  | { type: 'UPDATE_EMPLOYMENT'; payload: EmploymentIncome | undefined }
+  | { type: 'UPDATE_SPOUSE_EMPLOYMENT'; payload: EmploymentIncome | undefined }
+  | { type: 'ADD_RETIREMENT_INCOME'; payload: RetirementIncome }
+  | { type: 'UPDATE_RETIREMENT_INCOME'; payload: RetirementIncome }
+  | { type: 'REMOVE_RETIREMENT_INCOME'; payload: string }
   | { type: 'UPDATE_SOCIAL_SECURITY'; payload: Partial<SocialSecurity> }
   | { type: 'UPDATE_EXPENSES'; payload: Partial<Expenses> }
   | { type: 'ADD_EXPENSE'; payload: Expense }

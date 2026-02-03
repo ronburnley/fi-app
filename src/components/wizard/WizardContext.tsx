@@ -15,7 +15,7 @@ interface WizardContextType {
 
 const WizardContext = createContext<WizardContextType | null>(null);
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 8;
 
 interface WizardProviderProps {
   children: ReactNode;

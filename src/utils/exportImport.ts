@@ -1,5 +1,5 @@
 import type { AppState } from '../types';
-import { DEFAULT_STATE } from '../constants/defaults';
+import { DEFAULT_STATE, DEFAULT_INCOME } from '../constants/defaults';
 import { isLegacyAssetFormat, migrateLegacyAssets } from './migration';
 
 export function exportState(state: AppState): void {
@@ -130,9 +130,19 @@ export function mergeWithDefaults(partial: Partial<AppState>): AppState {
       }
     : DEFAULT_STATE.socialSecurity;
 
+  // Handle income (may not exist in older exports)
+  const mergedIncome = partial.income
+    ? {
+        ...DEFAULT_INCOME,
+        ...partial.income,
+        retirementIncomes: partial.income.retirementIncomes || [],
+      }
+    : DEFAULT_INCOME;
+
   return {
     profile: { ...DEFAULT_STATE.profile, ...partial.profile },
     assets: mergedAssets,
+    income: mergedIncome,
     socialSecurity: mergedSocialSecurity,
     expenses: { ...DEFAULT_STATE.expenses, ...partial.expenses },
     lifeEvents: partial.lifeEvents || DEFAULT_STATE.lifeEvents,

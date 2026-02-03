@@ -46,7 +46,7 @@ export function WizardNavigation({ onValidate, showSkip = false }: WizardNavigat
           </Button>
         )}
         <Button onClick={handleNext}>
-          {currentStep === 6 ? 'View Results' : 'Continue'}
+          {currentStep === 7 ? 'View Results' : 'Continue'}
         </Button>
       </div>
     </div>

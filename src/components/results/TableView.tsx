@@ -2,11 +2,20 @@ import { useState } from 'react';
 import { useProjection } from '../../hooks/useProjection';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/formatters';
+import type { FinancialPhase } from '../../types';
+
+// Phase badge colors and labels
+const PHASE_CONFIG: Record<FinancialPhase, { label: string; color: string; bg: string }> = {
+  working: { label: 'WORK', color: 'text-blue-400', bg: 'bg-blue-400/10' },
+  gap: { label: 'GAP', color: 'text-amber-400', bg: 'bg-amber-400/10' },
+  fi: { label: 'FI', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+};
 
 export function TableView() {
   const { state } = useApp();
   const { projections } = useProjection();
-  const [showAllYears, setShowAllYears] = useState(false);
+  // Default to showing all years to see the full timeline
+  const [showAllYears, setShowAllYears] = useState(true);
 
   const effectiveFIAge = state.profile.targetFIAge;
 
@@ -14,10 +23,13 @@ export function TableView() {
   const hasAnyShortfall = projections.some((p) => p.isShortfall);
   const firstShortfallAge = projections.find((p) => p.isShortfall)?.age;
 
+  // Check if there's employment income (to show employment-related columns)
+  const hasEmploymentIncome = state.income.employment || state.income.spouseEmployment;
+  const hasRetirementIncome = state.income.retirementIncomes.length > 0;
+
   // Filter logic:
-  // - If any shortfall exists, show from first shortfall year onward
-  // - Otherwise show from FI age onward
-  // - "Show all years" always shows everything
+  // - "Show all years" shows everything (default now)
+  // - Otherwise show from FI age or first shortfall
   const displayProjections = showAllYears
     ? projections
     : hasAnyShortfall && firstShortfallAge !== undefined
@@ -43,6 +55,24 @@ export function TableView() {
               <th className="sticky left-0 bg-bg-tertiary px-4 py-2 text-left text-xs font-medium text-text-muted">
                 Age
               </th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-text-muted whitespace-nowrap">
+                Phase
+              </th>
+              {hasEmploymentIncome && (
+                <>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                    Emp. Inc
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                    Contrib
+                  </th>
+                </>
+              )}
+              {hasRetirementIncome && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Ret. Inc
+                </th>
+              )}
               <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Expenses
               </th>
@@ -89,6 +119,7 @@ export function TableView() {
               const isCurrentAge = projection.age === state.profile.currentAge;
               // Only show FI badge if there are no shortfalls (FI was actually achieved)
               const isFIStart = !hasAnyShortfall && projection.age === effectiveFIAge;
+              const phaseConfig = PHASE_CONFIG[projection.phase];
 
               return (
                 <tr
@@ -117,6 +148,28 @@ export function TableView() {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-2 text-center whitespace-nowrap">
+                    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${phaseConfig.color} ${phaseConfig.bg}`}>
+                      {phaseConfig.label}
+                    </span>
+                  </td>
+                  {hasEmploymentIncome && (
+                    <>
+                      <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                        {projection.employmentIncome > 0 ? formatCurrency(projection.employmentIncome) : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                        <span className={projection.contributions > 0 ? 'text-emerald-400' : 'text-text-muted'}>
+                          {projection.contributions > 0 ? formatCurrency(projection.contributions) : '-'}
+                        </span>
+                      </td>
+                    </>
+                  )}
+                  {hasRetirementIncome && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {projection.retirementIncome > 0 ? formatCurrency(projection.retirementIncome) : '-'}
+                    </td>
+                  )}
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.expenses > 0 ? formatCurrency(projection.expenses) : '-'}
                   </td>
@@ -143,7 +196,7 @@ export function TableView() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-left text-text-muted text-xs whitespace-nowrap">
-                    {projection.withdrawal > 0 ? projection.withdrawalSource : '-'}
+                    {projection.withdrawal > 0 ? projection.withdrawalSource : (projection.phase === 'working' && projection.contributions > 0 ? 'Contributing' : '-')}
                   </td>
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {formatCurrency(projection.taxableBalance)}

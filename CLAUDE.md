@@ -653,6 +653,55 @@ When building this app:
 
 ## Changelog
 
+### v4.3 - 2026-02-03 - Income Modeling & Timeline Restructure
+
+**Major Change:**
+The app now models the complete financial journey from **current age through life expectancy**, with FI as a milestone along the way. Employment income during working years is tracked, contributions grow accounts, and the timeline shows accumulation before FI, not just drawdown after.
+
+**New Features:**
+- Employment income modeling with salary, contributions, retirement age, and effective tax rate
+- Separate spouse employment tracking (different retirement ages supported)
+- Retirement income streams (consulting, rentals, royalties) with start/end ages
+- Three financial phases: WORKING → GAP → FI
+- Contributions automatically added to retirement accounts during working years
+- Surplus income (after expenses) saved to taxable accounts
+
+**Data Model Changes:**
+- New `EmploymentIncome` interface: annualGrossIncome, annualContributions, endAge, effectiveTaxRate
+- New `RetirementIncome` interface: name, annualAmount, startAge, endAge, inflationAdjusted, taxable
+- New `FinancialPhase` type: `'working' | 'gap' | 'fi'`
+- New `Income` interface combining employment and retirementIncomes
+- Added `income` field to `AppState`
+- Added `phase`, `employmentIncome`, `contributions`, `retirementIncome` to `YearProjection`
+- New AppAction types: UPDATE_INCOME, UPDATE_EMPLOYMENT, UPDATE_SPOUSE_EMPLOYMENT, ADD/UPDATE/REMOVE_RETIREMENT_INCOME
+
+**UI Changes:**
+- New wizard step 3: "Income" (wizard now 8 steps instead of 7)
+- Employment income toggle with fields for gross income, contributions, retirement age, tax rate
+- Spouse employment section when filing status is married
+- Retirement income streams table with add/edit/delete modal
+- TableView defaults to showing all years (full timeline)
+- New "Phase" column with color-coded badges (WORK blue, GAP amber, FI green)
+- New "Emp. Inc" and "Contrib" columns when employment configured
+- New "Ret. Inc" column when retirement income configured
+- Chart shows amber "Retire" reference line for employment end age
+- SummaryMetrics shows "Years to Retirement" card when employment configured
+
+**Calculation Changes:**
+- `determinePhase()` - determines working/gap/fi status based on ages
+- `calculateEmploymentIncome()` - computes gross, net, tax, and contributions
+- `addContributionsToAccounts()` - distributes contributions proportionally to retirement accounts
+- `calculateRetirementIncomeStreams()` - sums active streams with optional inflation adjustment
+- `addSurplusToAccounts()` - adds working-year savings to taxable account
+- Main projection loop restructured for three phases:
+  - WORKING: Employment covers expenses, contributions grow accounts, surplus saved
+  - GAP: Withdrawals bridge between retirement and FI
+  - FI: Full drawdown with SS, pension, and retirement income streams
+
+**Migration:**
+- Backward compatible: existing saved data loads without income (uses empty defaults)
+- Import/export updated to handle income field
+
 ### v4.2 - 2026-02-03 - Mini Mortgage Calculator
 
 **New Features:**

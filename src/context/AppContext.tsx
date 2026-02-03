@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useState, useRef, type ReactNode } from 'react';
 import type { AppState, AppAction, WhatIfAdjustments } from '../types';
-import { DEFAULT_STATE, DEFAULT_WHAT_IF, STORAGE_KEY } from '../constants/defaults';
+import { DEFAULT_STATE, DEFAULT_WHAT_IF, DEFAULT_INCOME, STORAGE_KEY } from '../constants/defaults';
 import {
   isLegacyAssetFormat,
   migrateLegacyAssets,
@@ -63,6 +63,59 @@ function appReducer(state: AppState, action: AppAction): AppState {
         assets: {
           ...state.assets,
           accounts: state.assets.accounts.filter((asset) => asset.id !== action.payload),
+        },
+      };
+
+    case 'UPDATE_INCOME':
+      return {
+        ...state,
+        income: { ...state.income, ...action.payload },
+      };
+
+    case 'UPDATE_EMPLOYMENT':
+      return {
+        ...state,
+        income: {
+          ...state.income,
+          employment: action.payload,
+        },
+      };
+
+    case 'UPDATE_SPOUSE_EMPLOYMENT':
+      return {
+        ...state,
+        income: {
+          ...state.income,
+          spouseEmployment: action.payload,
+        },
+      };
+
+    case 'ADD_RETIREMENT_INCOME':
+      return {
+        ...state,
+        income: {
+          ...state.income,
+          retirementIncomes: [...state.income.retirementIncomes, action.payload],
+        },
+      };
+
+    case 'UPDATE_RETIREMENT_INCOME':
+      return {
+        ...state,
+        income: {
+          ...state.income,
+          retirementIncomes: state.income.retirementIncomes.map((ri) =>
+            ri.id === action.payload.id ? action.payload : ri
+          ),
+        },
+      };
+
+    case 'REMOVE_RETIREMENT_INCOME':
+      return {
+        ...state,
+        income: {
+          ...state.income,
+          retirementIncomes: state.income.retirementIncomes.filter((ri) => ri.id !== action.payload),
         },
       };
 
@@ -194,6 +247,9 @@ function loadInitialState(): AppState {
         };
       }
 
+      // Migrate income if missing (backward compatibility)
+      const migratedIncome = parsed.income || DEFAULT_INCOME;
+
       // Merge with defaults to handle any missing fields from older versions
       return {
         profile: { ...DEFAULT_STATE.profile, ...parsed.profile },
@@ -201,6 +257,11 @@ function loadInitialState(): AppState {
           ...DEFAULT_STATE.assets,
           ...migratedAssets,
           accounts: migratedAssets.accounts || DEFAULT_STATE.assets.accounts,
+        },
+        income: {
+          ...DEFAULT_INCOME,
+          ...migratedIncome,
+          retirementIncomes: migratedIncome.retirementIncomes || [],
         },
         socialSecurity: {
           ...DEFAULT_STATE.socialSecurity,
@@ -242,7 +303,7 @@ export function AppProvider({ children }: AppProviderProps) {
   const lastCalculatedFIAge = useRef<number | null>(null);
 
   // Extract values for dependency tracking
-  const { assets, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
+  const { assets, income, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
   const { currentAge, lifeExpectancy, filingStatus, spouseAge, state: profileState, targetFIAge } = profile;
 
   // Sync targetFIAge with calculated achievable FI age
@@ -261,6 +322,7 @@ export function AppProvider({ children }: AppProviderProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     assets,
+    income,
     expenses,
     socialSecurity,
     assumptions,

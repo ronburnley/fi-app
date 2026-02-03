@@ -1,4 +1,4 @@
-import type { AppState, WhatIfAdjustments, Asset, Expense, ExpenseCategory } from '../types';
+import type { AppState, WhatIfAdjustments, Asset, Expense, ExpenseCategory, Income } from '../types';
 import { generateId } from '../utils/migration';
 
 // Expense category display names
@@ -54,6 +54,13 @@ function createDefaultAsset(
   };
 }
 
+// Default income state (empty - user optionally adds employment/retirement income)
+export const DEFAULT_INCOME: Income = {
+  employment: undefined,
+  spouseEmployment: undefined,
+  retirementIncomes: [],
+};
+
 export const DEFAULT_STATE: AppState = {
   profile: {
     currentAge: 45,
@@ -81,6 +88,7 @@ export const DEFAULT_STATE: AppState = {
     homeEquity: 400000,
     pension: undefined,
   },
+  income: DEFAULT_INCOME,
   socialSecurity: {
     include: true,
     monthlyBenefit: 2500,
