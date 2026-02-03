@@ -1,5 +1,5 @@
-import { createContext, useContext, useReducer, useEffect, useState, useRef, type ReactNode } from 'react';
-import type { AppState, AppAction, WhatIfAdjustments } from '../types';
+import { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
+import type { AppState, AppAction, WhatIfAdjustments, SyncStatus } from '../types';
 import { DEFAULT_STATE, DEFAULT_WHAT_IF, DEFAULT_INCOME, STORAGE_KEY } from '../constants/defaults';
 import {
   isLegacyAssetFormat,
@@ -10,12 +10,21 @@ import {
   migrateHomeExpense,
 } from '../utils/migration';
 import { calculateAchievableFIAge } from '../utils/calculations';
+import { useAuth } from './AuthContext';
+import { supabase } from '../lib/supabase';
+import type { FinancialPlan } from '../types';
 
 interface AppContextType {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
   whatIf: WhatIfAdjustments;
   setWhatIf: React.Dispatch<React.SetStateAction<WhatIfAdjustments>>;
+  syncStatus: SyncStatus;
+  isLoading: boolean;
+  needsMigration: boolean;
+  localDataToMigrate: string | null;
+  acceptMigration: () => Promise<void>;
+  declineMigration: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -218,79 +227,100 @@ function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-function loadInitialState(): AppState {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-
-      // Check if assets need migration from legacy format
-      let migratedAssets = parsed.assets;
-      if (isLegacyAssetFormat(parsed.assets)) {
-        migratedAssets = migrateLegacyAssets(parsed.assets);
+// Merge with defaults to ensure all fields exist (handles schema evolution)
+function mergeWithDefaults(partial: Partial<AppState>): AppState {
+  // Handle assets with accounts array
+  const mergedAssets = partial.assets
+    ? {
+        ...DEFAULT_STATE.assets,
+        ...partial.assets,
+        accounts: partial.assets.accounts || DEFAULT_STATE.assets.accounts,
       }
+    : DEFAULT_STATE.assets;
 
-      // Check if expenses need migration from legacy format
-      let migratedExpenses = parsed.expenses;
-      if (isLegacyExpenseFormat(parsed.expenses)) {
-        migratedExpenses = migrateLegacyExpenses(
-          parsed.expenses,
-          parsed.assumptions?.inflationRate ?? 0.03
-        );
+  // Handle assumptions with penaltySettings
+  const mergedAssumptions = partial.assumptions
+    ? {
+        ...DEFAULT_STATE.assumptions,
+        ...partial.assumptions,
+        penaltySettings: {
+          ...DEFAULT_STATE.assumptions.penaltySettings,
+          ...partial.assumptions.penaltySettings,
+        },
       }
+    : DEFAULT_STATE.assumptions;
 
-      // Check if home expense needs mortgage migration (legacy to new format)
-      if (migratedExpenses?.home && needsMortgageMigration(migratedExpenses.home)) {
-        migratedExpenses = {
-          ...migratedExpenses,
-          home: migrateHomeExpense(migratedExpenses.home),
-        };
+  // Handle socialSecurity with spouse
+  const mergedSocialSecurity = partial.socialSecurity
+    ? {
+        ...DEFAULT_STATE.socialSecurity,
+        ...partial.socialSecurity,
+        spouse: partial.socialSecurity.spouse
+          ? {
+              include: partial.socialSecurity.spouse.include ?? DEFAULT_STATE.socialSecurity.spouse!.include,
+              monthlyBenefit: partial.socialSecurity.spouse.monthlyBenefit ?? DEFAULT_STATE.socialSecurity.spouse!.monthlyBenefit,
+              startAge: partial.socialSecurity.spouse.startAge ?? DEFAULT_STATE.socialSecurity.spouse!.startAge,
+            }
+          : DEFAULT_STATE.socialSecurity.spouse,
       }
+    : DEFAULT_STATE.socialSecurity;
 
-      // Migrate income if missing (backward compatibility)
-      const migratedIncome = parsed.income || DEFAULT_INCOME;
+  // Handle income (may not exist in older data)
+  const mergedIncome = partial.income
+    ? {
+        ...DEFAULT_INCOME,
+        ...partial.income,
+        retirementIncomes: partial.income.retirementIncomes || [],
+      }
+    : DEFAULT_INCOME;
 
-      // Merge with defaults to handle any missing fields from older versions
-      return {
-        profile: { ...DEFAULT_STATE.profile, ...parsed.profile },
-        assets: {
-          ...DEFAULT_STATE.assets,
-          ...migratedAssets,
-          accounts: migratedAssets.accounts || DEFAULT_STATE.assets.accounts,
-        },
-        income: {
-          ...DEFAULT_INCOME,
-          ...migratedIncome,
-          retirementIncomes: migratedIncome.retirementIncomes || [],
-        },
-        socialSecurity: {
-          ...DEFAULT_STATE.socialSecurity,
-          ...parsed.socialSecurity,
-          spouse: {
-            ...DEFAULT_STATE.socialSecurity.spouse,
-            ...parsed.socialSecurity?.spouse,
-          },
-        },
-        expenses: {
-          ...DEFAULT_STATE.expenses,
-          ...migratedExpenses,
-          categories: migratedExpenses.categories || DEFAULT_STATE.expenses.categories,
-        },
-        lifeEvents: parsed.lifeEvents || [],
-        assumptions: {
-          ...DEFAULT_STATE.assumptions,
-          ...parsed.assumptions,
-          penaltySettings: {
-            ...DEFAULT_STATE.assumptions.penaltySettings,
-            ...parsed.assumptions?.penaltySettings,
-          },
-        },
-      };
-    }
-  } catch (e) {
-    console.warn('Failed to load saved state:', e);
+  // Handle expenses with categories
+  const mergedExpenses = partial.expenses
+    ? {
+        ...DEFAULT_STATE.expenses,
+        ...partial.expenses,
+        categories: partial.expenses.categories || DEFAULT_STATE.expenses.categories,
+      }
+    : DEFAULT_STATE.expenses;
+
+  return {
+    profile: { ...DEFAULT_STATE.profile, ...partial.profile },
+    assets: mergedAssets,
+    income: mergedIncome,
+    socialSecurity: mergedSocialSecurity,
+    expenses: mergedExpenses,
+    lifeEvents: partial.lifeEvents || DEFAULT_STATE.lifeEvents,
+    assumptions: mergedAssumptions,
+  };
+}
+
+// Migrate data from various legacy formats
+function migrateData(data: AppState): AppState {
+  let migratedAssets = data.assets;
+  if (isLegacyAssetFormat(data.assets)) {
+    migratedAssets = migrateLegacyAssets(data.assets);
   }
-  return DEFAULT_STATE;
+
+  let migratedExpenses = data.expenses;
+  if (isLegacyExpenseFormat(data.expenses)) {
+    migratedExpenses = migrateLegacyExpenses(
+      data.expenses,
+      data.assumptions?.inflationRate ?? 0.03
+    );
+  }
+
+  if (migratedExpenses?.home && needsMortgageMigration(migratedExpenses.home)) {
+    migratedExpenses = {
+      ...migratedExpenses,
+      home: migrateHomeExpense(migratedExpenses.home),
+    };
+  }
+
+  return mergeWithDefaults({
+    ...data,
+    assets: migratedAssets,
+    expenses: migratedExpenses,
+  });
 }
 
 interface AppProviderProps {
@@ -298,13 +328,158 @@ interface AppProviderProps {
 }
 
 export function AppProvider({ children }: AppProviderProps) {
-  const [state, dispatch] = useReducer(appReducer, undefined, loadInitialState);
+  const { user } = useAuth();
+  const [state, dispatch] = useReducer(appReducer, DEFAULT_STATE);
   const [whatIf, setWhatIf] = useState<WhatIfAdjustments>(DEFAULT_WHAT_IF);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [isLoading, setIsLoading] = useState(true);
+  const [planId, setPlanId] = useState<string | null>(null);
+  const [needsMigration, setNeedsMigration] = useState(false);
+  const [localDataToMigrate, setLocalDataToMigrate] = useState<string | null>(null);
   const lastCalculatedFIAge = useRef<number | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialLoad = useRef(true);
 
   // Extract values for dependency tracking
   const { assets, income, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
   const { currentAge, lifeExpectancy, filingStatus, spouseAge, state: profileState, targetFIAge } = profile;
+
+  // Load plan from Supabase when user changes
+  useEffect(() => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
+    const loadPlan = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('financial_plans')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          // PGRST116 = no rows found
+          console.error('Error loading plan:', error);
+          throw error;
+        }
+
+        if (data) {
+          // Existing plan found
+          const plan = data as FinancialPlan;
+          const migratedState = migrateData(plan.data);
+          setPlanId(plan.id);
+          dispatch({ type: 'LOAD_STATE', payload: migratedState });
+          isInitialLoad.current = false;
+        } else {
+          // No plan exists, check for localStorage migration
+          const localData = localStorage.getItem(STORAGE_KEY);
+          if (localData) {
+            setLocalDataToMigrate(localData);
+            setNeedsMigration(true);
+          } else {
+            // Create new plan with defaults
+            const { data: newPlan, error: createError } = await supabase
+              .from('financial_plans')
+              .insert({
+                user_id: user.id,
+                name: 'My Plan',
+                data: DEFAULT_STATE,
+              })
+              .select()
+              .single();
+
+            if (createError) {
+              console.error('Error creating plan:', createError);
+            } else if (newPlan) {
+              setPlanId(newPlan.id);
+              isInitialLoad.current = false;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load plan:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPlan();
+  }, [user]);
+
+  // Accept migration from localStorage
+  const acceptMigration = useCallback(async () => {
+    if (!user || !localDataToMigrate) return;
+
+    try {
+      const parsed = JSON.parse(localDataToMigrate);
+      const migratedState = migrateData(parsed);
+
+      // Create plan with migrated data
+      const { data: newPlan, error } = await supabase
+        .from('financial_plans')
+        .insert({
+          user_id: user.id,
+          name: 'My Plan',
+          data: migratedState,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating plan:', error);
+        throw error;
+      }
+
+      if (newPlan) {
+        // Clear localStorage after successful migration
+        localStorage.removeItem(STORAGE_KEY);
+        setPlanId(newPlan.id);
+        dispatch({ type: 'LOAD_STATE', payload: migratedState });
+        setNeedsMigration(false);
+        setLocalDataToMigrate(null);
+        isInitialLoad.current = false;
+      }
+    } catch (err) {
+      console.error('Migration failed:', err);
+    }
+  }, [user, localDataToMigrate]);
+
+  // Decline migration - start fresh
+  const declineMigration = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      // Create new plan with defaults
+      const { data: newPlan, error } = await supabase
+        .from('financial_plans')
+        .insert({
+          user_id: user.id,
+          name: 'My Plan',
+          data: DEFAULT_STATE,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating plan:', error);
+        throw error;
+      }
+
+      if (newPlan) {
+        // Clear localStorage
+        localStorage.removeItem(STORAGE_KEY);
+        setPlanId(newPlan.id);
+        setNeedsMigration(false);
+        setLocalDataToMigrate(null);
+        isInitialLoad.current = false;
+      }
+    } catch (err) {
+      console.error('Failed to create plan:', err);
+    }
+  }, [user]);
 
   // Sync targetFIAge with calculated achievable FI age
   useEffect(() => {
@@ -336,17 +511,63 @@ export function AppProvider({ children }: AppProviderProps) {
     whatIf,
   ]);
 
-  // Persist state to localStorage
+  // Auto-save to Supabase when state changes (debounced)
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-      console.warn('Failed to save state:', e);
+    // Skip saving during initial load or if no plan exists
+    if (isInitialLoad.current || !planId || !user) return;
+
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
-  }, [state]);
+
+    setSyncStatus('syncing');
+
+    // Debounce saves by 1 second
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('financial_plans')
+          .update({ data: state })
+          .eq('id', planId);
+
+        if (error) {
+          console.error('Error saving plan:', error);
+          setSyncStatus('error');
+        } else {
+          setSyncStatus('saved');
+          // Reset to idle after showing "saved" briefly
+          setTimeout(() => setSyncStatus('idle'), 2000);
+        }
+      } catch (err) {
+        console.error('Failed to save plan:', err);
+        setSyncStatus('error');
+      }
+    }, 1000);
+
+    // Cleanup on unmount
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [state, planId, user]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, whatIf, setWhatIf }}>
+    <AppContext.Provider
+      value={{
+        state,
+        dispatch,
+        whatIf,
+        setWhatIf,
+        syncStatus,
+        isLoading,
+        needsMigration,
+        localDataToMigrate,
+        acceptMigration,
+        declineMigration,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

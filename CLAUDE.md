@@ -24,8 +24,8 @@ People who have accumulated wealth and need confidence in their exit plan. They 
 | Framework | React 18+ |
 | Styling | Tailwind CSS |
 | Charts | Recharts |
-| State | React Context + useReducer (or Zustand if complexity grows) |
-| Data Persistence | Local storage + JSON export/import |
+| State | React Context + useReducer |
+| Auth & Database | Supabase (Google OAuth + PostgreSQL) |
 | Build | Vite |
 
 ---
@@ -299,7 +299,7 @@ interface YearProjection {
 ### Layout (Wizard Flow)
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Logo          [FI Status Indicator]     [Import] [Export]  │
+│  Logo          [FI Status Indicator]     [Sync] [User Menu] │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │              ●───●───○───○───○───○───○                      │
@@ -397,10 +397,13 @@ Note: FI age is no longer adjustable via slider - it's calculated based on input
 
 ```
 App
+├── AuthProvider               # Supabase auth state
+├── AppProvider                # App state + Supabase sync
 ├── Header
 │   ├── Logo
 │   ├── FIStatusIndicator      # Center - shows years to FI
-│   └── ImportExportButtons
+│   ├── SyncStatusIndicator    # Saving/Saved/Error
+│   └── UserMenu               # Avatar + logout
 ├── MainLayout
 │   ├── InputPanel
 │   │   ├── ProfileSection
@@ -430,9 +433,11 @@ All inputs should update projections immediately. Use debouncing (300ms) on text
 - Percentages: display as %, store as decimals
 - Show inline validation errors
 
-### Export/Import
-- **Export**: Download current state as `fi-runway-{date}.json`
-- **Import**: File picker, validate schema, confirm overwrite
+### Authentication & Sync
+- **Sign In**: Google OAuth via Supabase
+- **Auto-Save**: Changes saved to cloud automatically (1s debounce)
+- **Sync Status**: Header shows Saving.../Saved/Error indicator
+- **Migration**: First-time users with localStorage data get import prompt
 
 ### Responsive Behavior
 - Desktop: side-by-side panels
@@ -446,6 +451,9 @@ All inputs should update projections immediately. Use debouncing (300ms) on text
 ```
 src/
 ├── components/
+│   ├── auth/                  # Authentication components
+│   │   ├── LoginPage.tsx          # Google sign-in landing page
+│   │   └── MigrationPrompt.tsx    # localStorage migration prompt
 │   ├── ui/                    # Reusable primitives
 │   │   ├── Button.tsx
 │   │   ├── Input.tsx
@@ -456,9 +464,10 @@ src/
 │   │   ├── Slider.tsx
 │   │   ├── Card.tsx
 │   │   ├── Tooltip.tsx
+│   │   ├── LoadingScreen.tsx      # Full-page loading spinner
 │   │   └── FIStatusIndicator.tsx  # Header indicator showing years to FI
 │   ├── layout/
-│   │   ├── Header.tsx
+│   │   ├── Header.tsx             # Logo, FI indicator, sync status, user menu
 │   │   ├── MainLayout.tsx
 │   │   └── Panel.tsx
 │   ├── inputs/
@@ -492,15 +501,16 @@ src/
 ├── hooks/
 │   ├── useProjection.ts       # Core calculation hook
 │   ├── useAchievableFI.ts     # Calculates earliest achievable FI age
-│   ├── useLocalStorage.ts
 │   └── useDebounce.ts
 ├── context/
-│   └── AppContext.tsx         # Global state + migration
+│   ├── AuthContext.tsx        # Supabase auth state + methods
+│   └── AppContext.tsx         # Global state + Supabase sync
+├── lib/
+│   └── supabase.ts            # Supabase client initialization
 ├── utils/
 │   ├── calculations.ts        # Projection math + penalties
 │   ├── formatters.ts          # Currency, percent formatting
 │   ├── validators.ts          # Input validation
-│   ├── exportImport.ts        # JSON handling + migration
 │   └── migration.ts           # Legacy format migration
 ├── types/
 │   └── index.ts               # TypeScript interfaces
@@ -580,12 +590,12 @@ export const DEFAULT_STATE: AppState = {
 - Stacked area chart
 - Year-by-year table
 - What-if sliders
-- JSON export/import
+- User authentication (Google OAuth via Supabase)
+- Cloud sync (auto-save to Supabase PostgreSQL)
 - Responsive layout
 - Dark mode
 
 ### Out of Scope (Post-MVP)
-- User authentication / cloud sync
 - Detailed tax modeling (IRMAA, ACA subsidies)
 - Multiple scenarios saved side-by-side
 - Monte Carlo simulations
@@ -626,6 +636,16 @@ export const DEFAULT_STATE: AppState = {
 - [x] Wizard flow UX
 - [x] Table-based asset and life event entry
 
+### Phase 6: Authentication & Cloud Sync ✅
+- [x] Supabase project setup
+- [x] Google OAuth authentication
+- [x] Database schema (financial_plans table with RLS)
+- [x] Auto-save with debounce (1s)
+- [x] Sync status indicator in header
+- [x] User menu with logout
+- [x] localStorage migration prompt for existing users
+- [x] Remove JSON export/import (replaced by cloud sync)
+
 ---
 
 ## Success Metrics
@@ -652,6 +672,60 @@ When building this app:
 ---
 
 ## Changelog
+
+### v5.0 - 2026-02-03 - Supabase Authentication & Cloud Sync
+
+**Major Change:**
+Replaced localStorage + JSON export/import with Supabase authentication and cloud database storage. Data now syncs automatically across devices.
+
+**New Features:**
+- Google OAuth sign-in via Supabase
+- Automatic cloud sync with debounced saves (1 second delay)
+- Sync status indicator in header (Saving.../Saved/Error)
+- User menu with avatar and logout
+- localStorage migration prompt for existing users
+- Loading screens during auth check and data fetch
+
+**New Files:**
+- `src/lib/supabase.ts` - Supabase client initialization
+- `src/context/AuthContext.tsx` - Auth state and methods (signInWithGoogle, signOut)
+- `src/components/auth/LoginPage.tsx` - Google sign-in landing page
+- `src/components/auth/MigrationPrompt.tsx` - Prompts to import localStorage data
+- `src/components/ui/LoadingScreen.tsx` - Full-page loading spinner
+- `supabase-schema.sql` - Database schema for Supabase
+- `.env.example` - Environment variable template
+
+**Data Model Changes:**
+- New `FinancialPlan` interface for database records (id, user_id, name, data, timestamps)
+- New `SyncStatus` type: `'idle' | 'syncing' | 'saved' | 'error'`
+- AppContext now includes: syncStatus, isLoading, needsMigration, acceptMigration, declineMigration
+
+**UI Changes:**
+- New login page with "Sign in with Google" button
+- Header now shows sync status and user menu (replaced import/export buttons)
+- Loading screens during authentication and data loading
+- Migration prompt when localStorage data exists for new users
+
+**Files Removed:**
+- `src/utils/exportImport.ts` - No longer needed with cloud storage
+- `src/hooks/useLocalStorage.ts` - Replaced by Supabase sync
+
+**Database Schema:**
+```sql
+create table public.financial_plans (
+  id uuid primary key,
+  user_id uuid references auth.users(id),
+  name text default 'My Plan',
+  data jsonb not null,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+-- Row Level Security ensures users only access their own plans
+```
+
+**Environment Variables Required:**
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Supabase anon/public key
 
 ### v4.3 - 2026-02-03 - Income Modeling & Timeline Restructure
 

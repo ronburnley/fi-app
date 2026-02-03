@@ -1,42 +1,54 @@
-import { useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button, FIStatusIndicator } from '../ui';
 import { useApp } from '../../context/AppContext';
+import { useAuth } from '../../context/AuthContext';
 import { useWizard } from '../wizard/WizardContext';
 import { useAchievableFI } from '../../hooks/useAchievableFI';
-import { exportState, importState } from '../../utils/exportImport';
 
 export function Header() {
-  const { state, dispatch } = useApp();
+  const { syncStatus } = useApp();
+  const { user, signOut } = useAuth();
   const { currentStep } = useWizard();
   const achievableFI = useAchievableFI();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Show indicator after step 1 (once user has entered assets in step 2+)
   const showIndicator = currentStep >= 2;
 
-  const handleExport = () => {
-    exportState(state);
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const importedState = await importState(file);
-      dispatch({ type: 'LOAD_STATE', payload: importedState });
-    } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to import file');
+  // Close menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
     }
 
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSignOut = async () => {
+    setShowUserMenu(false);
+    await signOut();
+  };
+
+  // Get user initials for avatar
+  const getInitials = () => {
+    if (!user?.email) return '?';
+    const parts = user.email.split('@')[0].split(/[._-]/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
     }
+    return user.email[0].toUpperCase();
+  };
+
+  // Get display name
+  const getDisplayName = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name;
+    }
+    return user?.email?.split('@')[0] || 'User';
   };
 
   return (
@@ -68,47 +80,119 @@ export function Header() {
         <FIStatusIndicator result={achievableFI} isVisible={showIndicator} />
       </div>
 
-      {/* Right: Import/Export */}
+      {/* Right: Sync Status + User Menu */}
       <div className="header-right">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <Button variant="ghost" size="sm" onClick={handleImportClick}>
-          <svg
-            className="w-4 h-4 mr-1.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        {/* Sync Status Indicator */}
+        <div className="flex items-center gap-2 mr-2">
+          {syncStatus === 'syncing' && (
+            <div className="flex items-center gap-1.5 text-text-muted text-xs">
+              <svg
+                className="w-3.5 h-3.5 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span>Saving...</span>
+            </div>
+          )}
+          {syncStatus === 'saved' && (
+            <div className="flex items-center gap-1.5 text-accent-primary text-xs">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Saved</span>
+            </div>
+          )}
+          {syncStatus === 'error' && (
+            <div className="flex items-center gap-1.5 text-accent-danger text-xs">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>Error</span>
+            </div>
+          )}
+        </div>
+
+        {/* User Menu */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bg-tertiary transition-colors"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-            />
-          </svg>
-          Import
-        </Button>
-        <Button variant="secondary" size="sm" onClick={handleExport}>
-          <svg
-            className="w-4 h-4 mr-1.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-            />
-          </svg>
-          Export
-        </Button>
+            {/* Avatar */}
+            {user?.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt={getDisplayName()}
+                className="w-8 h-8 rounded-full"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-accent-blue/20 text-accent-blue flex items-center justify-center text-sm font-medium">
+                {getInitials()}
+              </div>
+            )}
+            <svg
+              className={`w-4 h-4 text-text-muted transition-transform ${showUserMenu ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Dropdown Menu */}
+          {showUserMenu && (
+            <div className="absolute right-0 mt-2 w-56 bg-bg-secondary border border-border-subtle rounded-lg shadow-lg py-1 z-50">
+              {/* User Info */}
+              <div className="px-4 py-3 border-b border-border-subtle">
+                <p className="text-sm font-medium text-text-primary truncate">
+                  {getDisplayName()}
+                </p>
+                <p className="text-xs text-text-muted truncate">
+                  {user?.email}
+                </p>
+              </div>
+
+              {/* Menu Items */}
+              <div className="py-1">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-none"
+                  onClick={handleSignOut}
+                >
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  Sign out
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

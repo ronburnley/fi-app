@@ -270,3 +270,18 @@ export type AppAction =
   | { type: 'UPDATE_ASSUMPTIONS'; payload: Partial<Assumptions> }
   | { type: 'LOAD_STATE'; payload: AppState }
   | { type: 'RESET_STATE' };
+
+// ==================== Supabase Types ====================
+
+// Database record for financial plan
+export interface FinancialPlan {
+  id: string;
+  user_id: string;
+  name: string;
+  data: AppState;
+  created_at: string;
+  updated_at: string;
+}
+
+// Sync status for UI indicators
+export type SyncStatus = 'idle' | 'syncing' | 'saved' | 'error';
