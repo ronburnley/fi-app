@@ -27,7 +27,6 @@ export function AssetsStep() {
 
   // Calculate totals
   const investmentAssets = assets.accounts.reduce((sum, asset) => sum + asset.balance, 0);
-  const netWorth = investmentAssets + (assets.homeEquity || 0);
 
   const handleAddAsset = (asset: Asset) => {
     dispatch({ type: 'ADD_ASSET', payload: asset });
@@ -73,13 +72,6 @@ export function AssetsStep() {
     });
   };
 
-  const updateHomeEquity = (value: number) => {
-    dispatch({
-      type: 'UPDATE_ASSETS',
-      payload: { homeEquity: value },
-    });
-  };
-
   return (
     <div className="max-w-lg mx-auto">
       {/* Header */}
@@ -102,23 +94,13 @@ export function AssetsStep() {
           }}
         />
 
-        <div className="flex justify-between items-start pt-2">
-          <div>
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
-              Investment Assets
-            </p>
-            <p className="text-3xl font-semibold text-text-primary tabular-nums">
-              {formatCurrencyCompact(investmentAssets)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
-              Net Worth
-            </p>
-            <p className="text-xl font-medium text-text-secondary tabular-nums">
-              {formatCurrencyCompact(netWorth)}
-            </p>
-          </div>
+        <div className="pt-2">
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wider mb-1">
+            Total Investment Assets
+          </p>
+          <p className="text-3xl font-semibold text-text-primary tabular-nums">
+            {formatCurrencyCompact(investmentAssets)}
+          </p>
         </div>
       </div>
 
@@ -190,25 +172,17 @@ export function AssetsStep() {
         </div>
       </div>
 
-      {/* Other Card */}
+      {/* Pension Card */}
       <div className="bg-bg-secondary border border-border-subtle rounded-xl mb-8">
         <div className="px-4 py-3 border-b border-border-subtle">
           <p className="text-xs font-medium text-text-muted uppercase tracking-wider">
-            Other
+            Pension
           </p>
         </div>
 
-        <div className="p-4 space-y-4">
-          {/* Home Equity */}
-          <CurrencyInput
-            label="Home Equity"
-            value={assets.homeEquity || 0}
-            onChange={updateHomeEquity}
-            hint="For reference only, not included in withdrawals"
-          />
-
+        <div className="p-4">
           {/* Pension Toggle + Inline Details */}
-          <div className="pt-2 border-t border-border-subtle">
+          <div>
             <Toggle
               label="Have a pension?"
               checked={hasPension}

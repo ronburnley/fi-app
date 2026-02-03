@@ -61,13 +61,6 @@ export function AssetsSection() {
     });
   };
 
-  const updateHomeEquity = (value: number) => {
-    dispatch({
-      type: 'UPDATE_ASSETS',
-      payload: { homeEquity: value },
-    });
-  };
-
   return (
     <Card title="Assets">
       <div className="space-y-4">
@@ -130,16 +123,6 @@ export function AssetsSection() {
           </svg>
           Add Asset
         </Button>
-
-        {/* Home Equity (display only) */}
-        <div className="pt-3 border-t border-border-subtle">
-          <CurrencyInput
-            label="Home Equity (optional)"
-            value={assets.homeEquity || 0}
-            onChange={updateHomeEquity}
-            hint="For reference only, not included in withdrawals"
-          />
-        </div>
 
         {/* Pension */}
         <div className="pt-3 border-t border-border-subtle space-y-3">
