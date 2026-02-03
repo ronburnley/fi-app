@@ -62,12 +62,54 @@ export function validateAssets(assets: Assets): ValidationError[] {
 export function validateExpenses(expenses: Expenses): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  if (expenses.annualSpending < 0) {
-    errors.push({ field: 'annualSpending', message: 'Annual spending cannot be negative' });
+  // Validate expense categories
+  for (const expense of expenses.categories) {
+    if (expense.annualAmount < 0) {
+      errors.push({ field: `expense.${expense.id}.annualAmount`, message: `${expense.name} amount cannot be negative` });
+    }
+    if (expense.annualAmount > 10000000) {
+      errors.push({ field: `expense.${expense.id}.annualAmount`, message: `${expense.name} amount seems unrealistically high` });
+    }
+    if (expense.inflationRate < 0 || expense.inflationRate > 0.2) {
+      errors.push({ field: `expense.${expense.id}.inflationRate`, message: `${expense.name} inflation rate should be between 0% and 20%` });
+    }
+    if (expense.startYear && expense.endYear && expense.startYear > expense.endYear) {
+      errors.push({ field: `expense.${expense.id}.endYear`, message: `${expense.name} end year must be after start year` });
+    }
   }
 
-  if (expenses.annualSpending > 10000000) {
-    errors.push({ field: 'annualSpending', message: 'Annual spending seems unrealistically high' });
+  // Validate home expenses
+  if (expenses.home) {
+    if (expenses.home.mortgage) {
+      const mortgage = expenses.home.mortgage;
+      if (mortgage.monthlyPayment < 0) {
+        errors.push({ field: 'home.mortgage.monthlyPayment', message: 'Mortgage payment cannot be negative' });
+      }
+      if (mortgage.homeValue < 0) {
+        errors.push({ field: 'home.mortgage.homeValue', message: 'Home value cannot be negative' });
+      }
+      if (mortgage.loanBalance < 0) {
+        errors.push({ field: 'home.mortgage.loanBalance', message: 'Loan balance cannot be negative' });
+      }
+      if (mortgage.interestRate < 0 || mortgage.interestRate > 0.25) {
+        errors.push({ field: 'home.mortgage.interestRate', message: 'Interest rate should be between 0% and 25%' });
+      }
+      if (mortgage.earlyPayoff?.enabled) {
+        const endYear = mortgage.originationYear + mortgage.loanTermYears;
+        if (mortgage.earlyPayoff.payoffYear > endYear) {
+          errors.push({ field: 'home.mortgage.earlyPayoff.payoffYear', message: 'Early payoff year must be before natural payoff date' });
+        }
+      }
+    }
+    if (expenses.home.propertyTax < 0) {
+      errors.push({ field: 'home.propertyTax', message: 'Property tax cannot be negative' });
+    }
+    if (expenses.home.insurance < 0) {
+      errors.push({ field: 'home.insurance', message: 'Home insurance cannot be negative' });
+    }
+    if (expenses.home.inflationRate < 0 || expenses.home.inflationRate > 0.2) {
+      errors.push({ field: 'home.inflationRate', message: 'Home expense inflation rate should be between 0% and 20%' });
+    }
   }
 
   return errors;

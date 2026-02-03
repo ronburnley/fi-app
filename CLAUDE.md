@@ -653,6 +653,44 @@ When building this app:
 
 ## Changelog
 
+### v4.2 - 2026-02-03 - Mini Mortgage Calculator
+
+**New Features:**
+- Full mortgage calculator with amortization formula (P&I calculation)
+- Home equity display (home value minus loan balance)
+- Early payoff modeling with estimated payoff amount
+- Custom payment override option for non-standard mortgages
+- Mortgage balance tracking in year-by-year projections
+
+**Data Model Changes:**
+- New `MortgageDetails` interface replacing simple `{monthlyPayment, endYear}`
+- Fields: homeValue, loanBalance, interestRate, loanTermYears (15/20/30), originationYear
+- Added `manualPaymentOverride` flag to preserve custom payments
+- Added optional `earlyPayoff` with enabled flag and payoffYear
+- Added `mortgageBalance` to `YearProjection` interface
+- Added `LegacyMortgage` type for migration support
+
+**UI Changes:**
+- Mortgage inputs: Home Value, Loan Balance, Interest Rate, Term dropdown, Origination Year
+- Summary box showing: Monthly P&I, Home Equity, Total Monthly, Payoff Year
+- "Enter custom payment" checkbox for manual override
+- Advanced section with early payoff toggle and estimated payoff amount
+- Underwater mortgage warning when loan exceeds home value
+- New "Mortgage" column in year-by-year results table
+
+**Calculation Changes:**
+- `calculateMonthlyPayment()` - standard amortization: M = P × [r(1+r)^n] / [(1+r)^n - 1]
+- `calculateRemainingBalance()` - balance at any point in loan term
+- `calculateHomeEquity()` - home value minus outstanding loan
+- `calculateMortgageBalanceForYear()` - tracks balance with early payoff support
+- Early payoff triggers large withdrawal in payoff year, stops payments after
+- Mortgage end year calculated from originationYear + loanTermYears
+
+**Migration:**
+- Auto-detects legacy `{monthlyPayment, endYear}` format
+- Converts to new format with `manualPaymentOverride: true` to preserve payment
+- Estimates origination year from end year and assumed 30-year term
+
 ### v4.1 - 2026-02-03 - Pension Input with COLA Support
 
 **New Features:**

@@ -1,7 +1,14 @@
 import { createContext, useContext, useReducer, useEffect, useState, useRef, type ReactNode } from 'react';
 import type { AppState, AppAction, WhatIfAdjustments } from '../types';
 import { DEFAULT_STATE, DEFAULT_WHAT_IF, STORAGE_KEY } from '../constants/defaults';
-import { isLegacyAssetFormat, migrateLegacyAssets } from '../utils/migration';
+import {
+  isLegacyAssetFormat,
+  migrateLegacyAssets,
+  isLegacyExpenseFormat,
+  migrateLegacyExpenses,
+  needsMortgageMigration,
+  migrateHomeExpense,
+} from '../utils/migration';
 import { calculateAchievableFIAge } from '../utils/calculations';
 
 interface AppContextType {
@@ -77,6 +84,44 @@ function appReducer(state: AppState, action: AppAction): AppState {
         expenses: { ...state.expenses, ...action.payload },
       };
 
+    case 'ADD_EXPENSE':
+      return {
+        ...state,
+        expenses: {
+          ...state.expenses,
+          categories: [...state.expenses.categories, action.payload],
+        },
+      };
+
+    case 'UPDATE_EXPENSE':
+      return {
+        ...state,
+        expenses: {
+          ...state.expenses,
+          categories: state.expenses.categories.map((expense) =>
+            expense.id === action.payload.id ? action.payload : expense
+          ),
+        },
+      };
+
+    case 'REMOVE_EXPENSE':
+      return {
+        ...state,
+        expenses: {
+          ...state.expenses,
+          categories: state.expenses.categories.filter((expense) => expense.id !== action.payload),
+        },
+      };
+
+    case 'UPDATE_HOME_EXPENSE':
+      return {
+        ...state,
+        expenses: {
+          ...state.expenses,
+          home: action.payload,
+        },
+      };
+
     case 'ADD_LIFE_EVENT':
       return {
         ...state,
@@ -132,6 +177,23 @@ function loadInitialState(): AppState {
         migratedAssets = migrateLegacyAssets(parsed.assets);
       }
 
+      // Check if expenses need migration from legacy format
+      let migratedExpenses = parsed.expenses;
+      if (isLegacyExpenseFormat(parsed.expenses)) {
+        migratedExpenses = migrateLegacyExpenses(
+          parsed.expenses,
+          parsed.assumptions?.inflationRate ?? 0.03
+        );
+      }
+
+      // Check if home expense needs mortgage migration (legacy to new format)
+      if (migratedExpenses?.home && needsMortgageMigration(migratedExpenses.home)) {
+        migratedExpenses = {
+          ...migratedExpenses,
+          home: migrateHomeExpense(migratedExpenses.home),
+        };
+      }
+
       // Merge with defaults to handle any missing fields from older versions
       return {
         profile: { ...DEFAULT_STATE.profile, ...parsed.profile },
@@ -148,7 +210,11 @@ function loadInitialState(): AppState {
             ...parsed.socialSecurity?.spouse,
           },
         },
-        expenses: { ...DEFAULT_STATE.expenses, ...parsed.expenses },
+        expenses: {
+          ...DEFAULT_STATE.expenses,
+          ...migratedExpenses,
+          categories: migratedExpenses.categories || DEFAULT_STATE.expenses.categories,
+        },
         lifeEvents: parsed.lifeEvents || [],
         assumptions: {
           ...DEFAULT_STATE.assumptions,

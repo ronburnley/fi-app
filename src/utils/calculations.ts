@@ -9,9 +9,136 @@ import type {
   PenaltySettings,
   StateTaxInfo,
   AchievableFIResult,
+  Expenses,
+  MortgageDetails,
 } from '../types';
 import { PENALTY_FREE_AGES } from '../constants/defaults';
 import { getStateTaxInfo } from '../constants/stateTaxes';
+
+// ==================== Mortgage Calculations ====================
+
+/**
+ * Calculate monthly P&I payment using standard amortization formula
+ * M = P * [r(1+r)^n] / [(1+r)^n - 1]
+ * where:
+ *   P = principal (loan balance)
+ *   r = monthly interest rate
+ *   n = number of monthly payments
+ */
+export function calculateMonthlyPayment(
+  principal: number,
+  annualRate: number,
+  termYears: number
+): number {
+  if (principal <= 0 || annualRate <= 0 || termYears <= 0) {
+    return 0;
+  }
+
+  const monthlyRate = annualRate / 12;
+  const numPayments = termYears * 12;
+
+  const payment =
+    principal *
+    (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
+    (Math.pow(1 + monthlyRate, numPayments) - 1);
+
+  return Math.round(payment * 100) / 100; // Round to cents
+}
+
+/**
+ * Calculate remaining mortgage balance at a specific point in time
+ * B = P * [(1+r)^n - (1+r)^p] / [(1+r)^n - 1]
+ * where:
+ *   P = original principal
+ *   r = monthly interest rate
+ *   n = total number of payments
+ *   p = number of payments made
+ */
+export function calculateRemainingBalance(
+  originalPrincipal: number,
+  annualRate: number,
+  originalTermYears: number,
+  yearsElapsed: number
+): number {
+  if (originalPrincipal <= 0 || yearsElapsed >= originalTermYears) {
+    return 0;
+  }
+
+  if (annualRate <= 0) {
+    // Zero interest: simple linear reduction
+    const totalPayments = originalTermYears * 12;
+    const paymentsMade = yearsElapsed * 12;
+    return originalPrincipal * (1 - paymentsMade / totalPayments);
+  }
+
+  const monthlyRate = annualRate / 12;
+  const totalPayments = originalTermYears * 12;
+  const paymentsMade = yearsElapsed * 12;
+
+  const compoundFactor = Math.pow(1 + monthlyRate, totalPayments);
+  const elapsedFactor = Math.pow(1 + monthlyRate, paymentsMade);
+
+  const balance =
+    originalPrincipal *
+    (compoundFactor - elapsedFactor) /
+    (compoundFactor - 1);
+
+  return Math.max(0, Math.round(balance * 100) / 100);
+}
+
+/**
+ * Calculate home equity (value minus outstanding loan)
+ */
+export function calculateHomeEquity(
+  homeValue: number,
+  loanBalance: number
+): number {
+  return Math.max(0, homeValue - loanBalance);
+}
+
+/**
+ * Calculate years remaining on mortgage from current year
+ */
+export function calculateMortgageEndYear(
+  originationYear: number,
+  termYears: number
+): number {
+  return originationYear + termYears;
+}
+
+/**
+ * Calculate remaining balance for a specific year given mortgage details
+ */
+export function calculateMortgageBalanceForYear(
+  mortgage: MortgageDetails,
+  year: number
+): number {
+  const yearsElapsed = year - mortgage.originationYear;
+
+  if (yearsElapsed < 0) {
+    // Before loan started
+    return mortgage.loanBalance;
+  }
+
+  if (yearsElapsed >= mortgage.loanTermYears) {
+    // Loan is paid off
+    return 0;
+  }
+
+  // Check for early payoff
+  if (mortgage.earlyPayoff?.enabled && year >= mortgage.earlyPayoff.payoffYear) {
+    return 0;
+  }
+
+  return calculateRemainingBalance(
+    mortgage.loanBalance,
+    mortgage.interestRate,
+    mortgage.loanTermYears,
+    yearsElapsed
+  );
+}
+
+// ==================== End Mortgage Calculations ====================
 
 interface AccountBalances {
   taxable: number;
@@ -470,6 +597,139 @@ function growAssetBalances(
   return newMap;
 }
 
+interface YearExpenseResult {
+  totalExpenses: number;
+  mortgageBalance: number | undefined;
+  mortgagePayoffAmount: number | undefined; // Amount needed for early payoff this year
+}
+
+/**
+ * Calculate total expenses for a specific year, handling:
+ * - Per-expense inflation rates
+ * - Start/end year constraints
+ * - Home expenses (mortgage with calculated end year, taxes/insurance with inflation)
+ * - Early mortgage payoff
+ */
+function calculateYearExpenses(
+  expenses: Expenses,
+  year: number,
+  currentYear: number,
+  fiAge: number,
+  currentAge: number,
+  globalInflationRate: number,
+  spendingMultiplier: number = 1
+): YearExpenseResult {
+  let totalExpenses = 0;
+  let mortgageBalance: number | undefined = undefined;
+  let mortgagePayoffAmount: number | undefined = undefined;
+
+  // Years since FI for inflation calculation
+  const fiYear = currentYear + (fiAge - currentAge);
+  const yearsSinceFI = Math.max(0, year - fiYear);
+
+  // Process regular expense categories
+  for (const expense of expenses.categories) {
+    const startYear = expense.startYear ?? currentYear;
+    const endYear = expense.endYear ?? Infinity;
+
+    // Skip if outside active years
+    if (year < startYear || year > endYear) continue;
+
+    // Calculate inflation-adjusted amount (only inflate after FI year)
+    const yearsOfInflation = yearsSinceFI;
+    const inflatedAmount = expense.annualAmount * Math.pow(1 + expense.inflationRate, yearsOfInflation);
+
+    totalExpenses += inflatedAmount;
+  }
+
+  // Process home expenses separately
+  if (expenses.home) {
+    const home = expenses.home;
+    const homeInflationRate = home.inflationRate ?? globalInflationRate;
+    const yearsOfInflation = yearsSinceFI;
+
+    // Mortgage handling with new MortgageDetails structure
+    if (home.mortgage) {
+      const mortgage = home.mortgage;
+
+      // Calculate natural end year from origination + term
+      const mortgageEndYear = mortgage.originationYear + mortgage.loanTermYears;
+
+      // Check for early payoff
+      const isEarlyPayoffYear = mortgage.earlyPayoff?.enabled && year === mortgage.earlyPayoff.payoffYear;
+      const wasAlreadyPaidOff = mortgage.earlyPayoff?.enabled && year > mortgage.earlyPayoff.payoffYear;
+
+      // Calculate remaining balance for this year
+      mortgageBalance = calculateMortgageBalanceForYear(mortgage, year);
+
+      if (isEarlyPayoffYear) {
+        // Early payoff year: add remaining balance as one-time expense
+        mortgagePayoffAmount = mortgageBalance;
+        mortgageBalance = 0; // After payoff
+        // No regular payment this year since we're paying it off
+      } else if (!wasAlreadyPaidOff && year <= mortgageEndYear) {
+        // Regular payment year
+        const mortgageAnnual = mortgage.monthlyPayment * 12;
+        totalExpenses += mortgageAnnual;
+      }
+      // If already paid off (either naturally or early), no payment
+    }
+
+    // Property Tax (inflates)
+    if (home.propertyTax > 0) {
+      const inflatedTax = home.propertyTax * Math.pow(1 + homeInflationRate, yearsOfInflation);
+      totalExpenses += inflatedTax;
+    }
+
+    // Insurance (inflates)
+    if (home.insurance > 0) {
+      const inflatedInsurance = home.insurance * Math.pow(1 + homeInflationRate, yearsOfInflation);
+      totalExpenses += inflatedInsurance;
+    }
+  }
+
+  // Apply spending adjustment multiplier (but not to mortgage payoff - that's a fixed amount)
+  return {
+    totalExpenses: totalExpenses * spendingMultiplier,
+    mortgageBalance,
+    mortgagePayoffAmount,
+  };
+}
+
+/**
+ * Calculate base annual spending (current year expenses) for FI number calculation
+ */
+function calculateBaseAnnualSpending(expenses: Expenses, currentYear: number): number {
+  let total = 0;
+
+  // Sum expense categories that are active in current year
+  for (const expense of expenses.categories) {
+    const startYear = expense.startYear ?? currentYear;
+    const endYear = expense.endYear ?? Infinity;
+    if (currentYear >= startYear && currentYear <= endYear) {
+      total += expense.annualAmount;
+    }
+  }
+
+  // Add home expenses
+  if (expenses.home) {
+    if (expenses.home.mortgage) {
+      const mortgage = expenses.home.mortgage;
+      const mortgageEndYear = mortgage.originationYear + mortgage.loanTermYears;
+      const isNotPaidOff = mortgage.earlyPayoff?.enabled
+        ? currentYear < mortgage.earlyPayoff.payoffYear
+        : currentYear <= mortgageEndYear;
+
+      if (isNotPaidOff) {
+        total += mortgage.monthlyPayment * 12;
+      }
+    }
+    total += expenses.home.propertyTax + expenses.home.insurance;
+  }
+
+  return total;
+}
+
 export function calculateProjection(
   state: AppState,
   whatIf?: WhatIfAdjustments
@@ -478,7 +738,7 @@ export function calculateProjection(
   const currentYear = new Date().getFullYear();
 
   // Apply what-if adjustments
-  const effectiveSpending = state.expenses.annualSpending * (1 + (whatIf?.spendingAdjustment || 0));
+  const spendingMultiplier = 1 + (whatIf?.spendingAdjustment || 0);
   const effectiveFIAge = state.profile.targetFIAge;
   const effectiveReturn = whatIf?.returnAdjustment ?? state.assumptions.investmentReturn;
   const effectiveSSAge = whatIf?.ssStartAge ?? state.socialSecurity.startAge;
@@ -493,7 +753,6 @@ export function calculateProjection(
 
   for (let age = profile.currentAge; age <= profile.lifeExpectancy; age++) {
     const year = currentYear + (age - profile.currentAge);
-    const yearsSinceFI = Math.max(0, age - effectiveFIAge);
     const isInFI = age >= effectiveFIAge;
 
     // Calculate spouse age
@@ -501,9 +760,25 @@ export function calculateProjection(
       ? age - (profile.currentAge - profile.spouseAge)
       : undefined;
 
-    // Calculate inflation-adjusted expenses (only matters after FI)
-    const inflationFactor = Math.pow(1 + assumptions.inflationRate, yearsSinceFI);
-    const yearExpenses = isInFI ? effectiveSpending * inflationFactor : 0;
+    // Calculate expenses using new category-based system
+    const expenseResult = calculateYearExpenses(
+      state.expenses,
+      year,
+      currentYear,
+      effectiveFIAge,
+      profile.currentAge,
+      assumptions.inflationRate,
+      spendingMultiplier
+    );
+
+    // Only count regular expenses during FI
+    const yearExpenses = isInFI ? expenseResult.totalExpenses : 0;
+    const mortgageBalance = expenseResult.mortgageBalance;
+
+    // Mortgage payoff amount if applicable (this is an additional expense for the payoff year)
+    const mortgagePayoffExpense = isInFI && expenseResult.mortgagePayoffAmount
+      ? expenseResult.mortgagePayoffAmount
+      : 0;
 
     // Add life events for this year
     const yearLifeEvents = lifeEvents.filter((e) => e.year === year);
@@ -538,9 +813,9 @@ export function calculateProjection(
       income += assets.pension.annualBenefit * pensionColaFactor;
     }
 
-    // Calculate gap (expenses + life events - income)
+    // Calculate gap (expenses + life events + mortgage payoff - income)
     // Life events: positive = expense, negative = income
-    const totalExpenses = yearExpenses + Math.max(0, lifeEventTotal);
+    const totalExpenses = yearExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
     const totalIncome = income + Math.abs(Math.min(0, lifeEventTotal));
 
     // During FI: gap covers regular expenses + life events
@@ -631,23 +906,30 @@ export function calculateProjection(
     const neededAmount = isInFI ? fiGap : preFILifeEventImpact;
     const isShortfall = neededAmount > 0 && totalBalance < neededAmount && withdrawal < neededAmount;
 
-    // Record this year's projection
-    const totalNetWorth = totalBalance + (assets.homeEquity || 0);
+    // Record this year's projection (liquid assets only, home is now in expenses)
+    const totalNetWorth = totalBalance;
 
     // Gap represents what needs to come from portfolio
     const gap = isInFI ? fiGap : Math.max(0, preFILifeEventImpact);
 
+    // Update withdrawal source if mortgage payoff occurred
+    const finalWithdrawalSource = mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A'
+      ? `${withdrawalSource} (+ Mortgage Payoff)`
+      : mortgagePayoffExpense > 0
+        ? 'Mortgage Payoff'
+        : withdrawalSource;
+
     projections.push({
       year,
       age,
-      expenses: yearExpenses + Math.max(0, lifeEventTotal),
+      expenses: totalExpenses,
       income: totalIncome,
       gap,
       withdrawal,
       withdrawalPenalty,
       federalTax,
       stateTax,
-      withdrawalSource,
+      withdrawalSource: finalWithdrawalSource,
       taxableBalance: balances.taxable,
       traditionalBalance: balances.traditional,
       rothBalance: balances.roth,
@@ -655,6 +937,7 @@ export function calculateProjection(
       cashBalance: balances.cash,
       totalNetWorth,
       isShortfall,
+      mortgageBalance,
     });
 
     // Grow balances for next year (if not in shortfall)
@@ -672,7 +955,9 @@ export function calculateSummary(
   projections: YearProjection[],
   whatIf?: WhatIfAdjustments
 ): ProjectionSummary {
-  const effectiveSpending = state.expenses.annualSpending * (1 + (whatIf?.spendingAdjustment || 0));
+  const currentYear = new Date().getFullYear();
+  const baseAnnualSpending = calculateBaseAnnualSpending(state.expenses, currentYear);
+  const effectiveSpending = baseAnnualSpending * (1 + (whatIf?.spendingAdjustment || 0));
   const effectiveSWR = state.assumptions.safeWithdrawalRate;
 
   // FI Number

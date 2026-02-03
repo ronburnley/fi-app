@@ -75,7 +75,58 @@ export interface SocialSecurity {
   spouse?: SpouseSocialSecurity;
 }
 
+// Expense categories for visual grouping
+export type ExpenseCategory = 'housing' | 'living' | 'healthcare' | 'discretionary' | 'other';
+
+export interface Expense {
+  id: string;
+  name: string;
+  annualAmount: number;
+  startYear?: number;      // undefined = current year
+  endYear?: number;        // undefined = perpetual (through life expectancy)
+  inflationRate: number;   // per-expense inflation (decimal, e.g., 0.03 = 3%)
+  category: ExpenseCategory;
+}
+
+export interface MortgageDetails {
+  // Core inputs
+  homeValue: number;              // Current market value
+  loanBalance: number;            // Outstanding principal
+  interestRate: number;           // Annual rate as decimal (0.065 = 6.5%)
+  loanTermYears: 15 | 20 | 30;    // Original term
+  originationYear: number;        // When loan started (to calculate years elapsed)
+
+  // Calculated (with manual override option)
+  monthlyPayment: number;         // P&I - auto-calculated but editable
+  manualPaymentOverride: boolean; // If true, user's custom payment preserved
+
+  // Early payoff
+  earlyPayoff?: {
+    enabled: boolean;
+    payoffYear: number;           // Year to pay off mortgage
+  };
+}
+
+// Legacy mortgage format for migration
+export interface LegacyMortgage {
+  monthlyPayment: number;
+  endYear: number;
+}
+
+export interface HomeExpense {
+  mortgage?: MortgageDetails;
+  propertyTax: number;         // Annual amount
+  insurance: number;           // Annual homeowners insurance
+  inflationRate: number;       // For taxes/insurance only (default 0.03)
+}
+
 export interface Expenses {
+  categories: Expense[];       // Array of expense categories
+  home?: HomeExpense;          // Special housing expense structure
+}
+
+// Legacy interface for migration
+export interface LegacyExpenses {
   annualSpending: number;
 }
 
@@ -126,6 +177,7 @@ export interface YearProjection {
   cashBalance: number;
   totalNetWorth: number;
   isShortfall: boolean;
+  mortgageBalance?: number;      // Remaining mortgage balance (if applicable)
 }
 
 export interface ProjectionSummary {
@@ -166,6 +218,10 @@ export type AppAction =
   | { type: 'REMOVE_ASSET'; payload: string }
   | { type: 'UPDATE_SOCIAL_SECURITY'; payload: Partial<SocialSecurity> }
   | { type: 'UPDATE_EXPENSES'; payload: Partial<Expenses> }
+  | { type: 'ADD_EXPENSE'; payload: Expense }
+  | { type: 'UPDATE_EXPENSE'; payload: Expense }
+  | { type: 'REMOVE_EXPENSE'; payload: string }
+  | { type: 'UPDATE_HOME_EXPENSE'; payload: HomeExpense | undefined }
   | { type: 'ADD_LIFE_EVENT'; payload: LifeEvent }
   | { type: 'UPDATE_LIFE_EVENT'; payload: LifeEvent }
   | { type: 'REMOVE_LIFE_EVENT'; payload: string }

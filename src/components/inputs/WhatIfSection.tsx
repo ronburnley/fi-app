@@ -1,10 +1,50 @@
+import { useMemo } from 'react';
 import { Card, Slider, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
 import { useAchievableFI } from '../../hooks/useAchievableFI';
+import type { Expenses } from '../../types';
+
+// Calculate base annual spending from expense categories
+function calculateBaseAnnualSpending(expenses: Expenses, currentYear: number): number {
+  let total = 0;
+
+  // Sum expense categories that are active in current year
+  for (const expense of expenses.categories) {
+    const startYear = expense.startYear ?? currentYear;
+    const endYear = expense.endYear ?? Infinity;
+    if (currentYear >= startYear && currentYear <= endYear) {
+      total += expense.annualAmount;
+    }
+  }
+
+  // Add home expenses
+  if (expenses.home) {
+    if (expenses.home.mortgage) {
+      const mortgage = expenses.home.mortgage;
+      const mortgageEndYear = mortgage.originationYear + mortgage.loanTermYears;
+      const isNotPaidOff = mortgage.earlyPayoff?.enabled
+        ? currentYear < mortgage.earlyPayoff.payoffYear
+        : currentYear <= mortgageEndYear;
+
+      if (isNotPaidOff) {
+        total += mortgage.monthlyPayment * 12;
+      }
+    }
+    total += expenses.home.propertyTax + expenses.home.insurance;
+  }
+
+  return total;
+}
 
 export function WhatIfSection() {
   const { state, whatIf, setWhatIf } = useApp();
   const achievableFI = useAchievableFI();
+
+  const currentYear = new Date().getFullYear();
+  const baseAnnualSpending = useMemo(
+    () => calculateBaseAnnualSpending(state.expenses, currentYear),
+    [state.expenses, currentYear]
+  );
 
   const formatSpendingAdjustment = (value: number) => {
     const sign = value >= 0 ? '+' : '';
@@ -73,7 +113,7 @@ export function WhatIfSection() {
             <div>
               <span className="text-text-muted">Spending: </span>
               <span className="text-text-primary tabular-nums">
-                ${Math.round(state.expenses.annualSpending * (1 + whatIf.spendingAdjustment)).toLocaleString()}
+                ${Math.round(baseAnnualSpending * (1 + whatIf.spendingAdjustment)).toLocaleString()}
               </span>
             </div>
             <div>

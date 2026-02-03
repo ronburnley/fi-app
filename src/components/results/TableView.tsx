@@ -77,6 +77,9 @@ export function TableView() {
                 Roth
               </th>
               <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                Mortgage
+              </th>
+              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Net Worth
               </th>
             </tr>
@@ -150,6 +153,11 @@ export function TableView() {
                   </td>
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {formatCurrency(projection.rothBalance)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                    {projection.mortgageBalance !== undefined && projection.mortgageBalance > 0
+                      ? formatCurrency(projection.mortgageBalance)
+                      : '-'}
                   </td>
                   <td
                     className={`px-4 py-2 text-right font-medium tabular-nums whitespace-nowrap ${

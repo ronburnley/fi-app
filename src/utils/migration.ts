@@ -1,4 +1,15 @@
-import type { Asset, Assets, LegacyAssets, AccountType, AccountOwner } from '../types';
+import type {
+  Asset,
+  Assets,
+  LegacyAssets,
+  AccountType,
+  AccountOwner,
+  Expenses,
+  LegacyExpenses,
+  MortgageDetails,
+  LegacyMortgage,
+  HomeExpense,
+} from '../types';
 
 // Generate a simple UUID
 function generateId(): string {
@@ -118,6 +129,103 @@ export function migrateLegacyAssets(legacy: LegacyAssets): Assets {
     accounts,
     homeEquity: legacy.homeEquity,
     pension: legacy.pension,
+  };
+}
+
+// Check if expenses are in legacy format (single annualSpending)
+export function isLegacyExpenseFormat(expenses: unknown): expenses is LegacyExpenses {
+  if (typeof expenses !== 'object' || expenses === null) return false;
+  const obj = expenses as Record<string, unknown>;
+  return (
+    'annualSpending' in obj &&
+    typeof obj.annualSpending === 'number' &&
+    !('categories' in obj)
+  );
+}
+
+// Migrate legacy single-value expense format to new category-based format
+export function migrateLegacyExpenses(legacy: LegacyExpenses, inflationRate: number = 0.03): Expenses {
+  // Convert single annual spending to a single "General Living" expense
+  // User can then break this down into categories
+  return {
+    categories: [
+      {
+        id: generateId(),
+        name: 'General Living Expenses',
+        annualAmount: legacy.annualSpending,
+        inflationRate: inflationRate,
+        category: 'living',
+      },
+    ],
+    home: undefined,
+  };
+}
+
+// Check if mortgage is in legacy format (monthlyPayment + endYear, no homeValue)
+export function isLegacyMortgageFormat(mortgage: unknown): mortgage is LegacyMortgage {
+  if (typeof mortgage !== 'object' || mortgage === null) return false;
+  const obj = mortgage as Record<string, unknown>;
+  return (
+    'monthlyPayment' in obj &&
+    'endYear' in obj &&
+    !('homeValue' in obj) &&
+    !('loanBalance' in obj)
+  );
+}
+
+// Migrate legacy mortgage format to new MortgageDetails format
+export function migrateLegacyMortgage(legacy: LegacyMortgage): MortgageDetails {
+  const currentYear = new Date().getFullYear();
+
+  // Calculate years remaining from endYear
+  const yearsRemaining = Math.max(0, legacy.endYear - currentYear);
+
+  // Assume 30-year term and work backwards to find origination year
+  // If years remaining is odd, we'll round up to closest common term
+  let loanTermYears: 15 | 20 | 30 = 30;
+  if (yearsRemaining <= 15) {
+    loanTermYears = 15;
+  } else if (yearsRemaining <= 20) {
+    loanTermYears = 20;
+  }
+
+  // Calculate approximate origination year
+  const originationYear = currentYear - (loanTermYears - yearsRemaining);
+
+  return {
+    // User must enter these values (they're essential for calculations)
+    homeValue: 0,
+    loanBalance: 0,
+    interestRate: 0.065, // Sensible default
+
+    // Derived/assumed values
+    loanTermYears,
+    originationYear,
+
+    // Preserve the user's payment as a manual override
+    monthlyPayment: legacy.monthlyPayment,
+    manualPaymentOverride: true,
+
+    earlyPayoff: undefined,
+  };
+}
+
+// Check if home expense needs mortgage migration
+export function needsMortgageMigration(home: unknown): boolean {
+  if (typeof home !== 'object' || home === null) return false;
+  const obj = home as Record<string, unknown>;
+  return 'mortgage' in obj && obj.mortgage !== null && isLegacyMortgageFormat(obj.mortgage);
+}
+
+// Migrate home expense with legacy mortgage to new format
+export function migrateHomeExpense(home: HomeExpense & { mortgage?: LegacyMortgage | MortgageDetails }): HomeExpense {
+  if (!home.mortgage || !isLegacyMortgageFormat(home.mortgage)) {
+    return home as HomeExpense;
+  }
+
+  return {
+    ...home,
+    mortgage: migrateLegacyMortgage(home.mortgage as LegacyMortgage),
   };
 }
 

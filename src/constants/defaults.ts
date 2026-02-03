@@ -1,5 +1,41 @@
-import type { AppState, WhatIfAdjustments, Asset } from '../types';
+import type { AppState, WhatIfAdjustments, Asset, Expense, ExpenseCategory } from '../types';
 import { generateId } from '../utils/migration';
+
+// Expense category display names
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  housing: 'Housing',
+  living: 'Living',
+  healthcare: 'Healthcare',
+  discretionary: 'Discretionary',
+  other: 'Other',
+};
+
+// Expense category colors for visual identification
+export const EXPENSE_CATEGORY_COLORS: Record<ExpenseCategory, string> = {
+  housing: '#60a5fa',      // blue-400
+  living: '#34d399',       // emerald-400
+  healthcare: '#f472b6',   // pink-400
+  discretionary: '#fbbf24', // amber-400
+  other: '#a1a1aa',        // zinc-400
+};
+
+// Helper to create default expenses
+function createDefaultExpense(
+  name: string,
+  category: ExpenseCategory,
+  annualAmount: number,
+  inflationRate: number = 0.03,
+  options?: Partial<Omit<Expense, 'id' | 'name' | 'category' | 'annualAmount' | 'inflationRate'>>
+): Expense {
+  return {
+    id: generateId(),
+    name,
+    category,
+    annualAmount,
+    inflationRate,
+    ...options,
+  };
+}
 
 // Helper to create default assets
 function createDefaultAsset(
@@ -57,7 +93,30 @@ export const DEFAULT_STATE: AppState = {
     },
   },
   expenses: {
-    annualSpending: 80000,
+    categories: [
+      createDefaultExpense('Groceries & Household', 'living', 12000),
+      createDefaultExpense('Utilities', 'living', 4800),
+      createDefaultExpense('Transportation', 'living', 6000, 0.025),
+      createDefaultExpense('Health Insurance', 'healthcare', 12000, 0.05),
+      createDefaultExpense('Medical Expenses', 'healthcare', 3000, 0.05),
+      createDefaultExpense('Travel & Entertainment', 'discretionary', 10000, 0.025),
+      createDefaultExpense('Dining Out', 'discretionary', 6000),
+    ],
+    home: {
+      mortgage: {
+        homeValue: 650000,
+        loanBalance: 400000,
+        interestRate: 0.065,
+        loanTermYears: 30,
+        originationYear: 2020,
+        monthlyPayment: 2528, // Calculated from the above
+        manualPaymentOverride: false,
+        earlyPayoff: undefined,
+      },
+      propertyTax: 8000,
+      insurance: 2400,
+      inflationRate: 0.03,
+    },
   },
   lifeEvents: [],
   assumptions: {
