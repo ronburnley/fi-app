@@ -757,7 +757,7 @@ function addContributionsToAccounts(
 function calculateRetirementIncomeStreams(
   retirementIncomes: RetirementIncome[],
   age: number,
-  yearsSinceFI: number,
+  _yearsSinceFI: number,  // No longer used - inflate from income start
   inflationRate: number
 ): number {
   let total = 0;
@@ -769,9 +769,12 @@ function calculateRetirementIncomeStreams(
 
     let amount = ri.annualAmount;
 
-    // Apply inflation adjustment if enabled
-    if (ri.inflationAdjusted && yearsSinceFI > 0) {
-      amount *= Math.pow(1 + inflationRate, yearsSinceFI);
+    // Apply inflation adjustment if enabled (from when income started)
+    if (ri.inflationAdjusted) {
+      const yearsSinceStart = age - ri.startAge;
+      if (yearsSinceStart > 0) {
+        amount *= Math.pow(1 + inflationRate, yearsSinceStart);
+      }
     }
 
     total += amount;
@@ -831,8 +834,8 @@ function calculateYearExpenses(
   expenses: Expenses,
   year: number,
   currentYear: number,
-  fiAge: number,
-  currentAge: number,
+  _fiAge: number,  // No longer used - expenses inflate from current year
+  _currentAge: number,  // No longer used
   globalInflationRate: number,
   spendingMultiplier: number = 1
 ): YearExpenseResult {
@@ -840,9 +843,9 @@ function calculateYearExpenses(
   let mortgageBalance: number | undefined = undefined;
   let mortgagePayoffAmount: number | undefined = undefined;
 
-  // Years since FI for inflation calculation
-  const fiYear = currentYear + (fiAge - currentAge);
-  const yearsSinceFI = Math.max(0, year - fiYear);
+  // Years from now for inflation calculation
+  // Expenses inflate every year, not just after FI
+  const yearsFromNow = Math.max(0, year - currentYear);
 
   // Process regular expense categories
   for (const expense of expenses.categories) {
@@ -852,9 +855,8 @@ function calculateYearExpenses(
     // Skip if outside active years
     if (year < startYear || year > endYear) continue;
 
-    // Calculate inflation-adjusted amount (only inflate after FI year)
-    const yearsOfInflation = yearsSinceFI;
-    const inflatedAmount = expense.annualAmount * Math.pow(1 + expense.inflationRate, yearsOfInflation);
+    // Calculate inflation-adjusted amount from current year
+    const inflatedAmount = expense.annualAmount * Math.pow(1 + expense.inflationRate, yearsFromNow);
 
     totalExpenses += inflatedAmount;
   }
@@ -863,7 +865,6 @@ function calculateYearExpenses(
   if (expenses.home) {
     const home = expenses.home;
     const homeInflationRate = home.inflationRate ?? globalInflationRate;
-    const yearsOfInflation = yearsSinceFI;
 
     // Mortgage handling with new MortgageDetails structure
     if (home.mortgage) {
@@ -892,15 +893,15 @@ function calculateYearExpenses(
       // If already paid off (either naturally or early), no payment
     }
 
-    // Property Tax (inflates)
+    // Property Tax (inflates from current year)
     if (home.propertyTax > 0) {
-      const inflatedTax = home.propertyTax * Math.pow(1 + homeInflationRate, yearsOfInflation);
+      const inflatedTax = home.propertyTax * Math.pow(1 + homeInflationRate, yearsFromNow);
       totalExpenses += inflatedTax;
     }
 
-    // Insurance (inflates)
+    // Insurance (inflates from current year)
     if (home.insurance > 0) {
-      const inflatedInsurance = home.insurance * Math.pow(1 + homeInflationRate, yearsOfInflation);
+      const inflatedInsurance = home.insurance * Math.pow(1 + homeInflationRate, yearsFromNow);
       totalExpenses += inflatedInsurance;
     }
   }
@@ -1070,7 +1071,9 @@ export function calculateProjection(
     if (phase === 'working') {
       // WORKING PHASE: Employment income covers expenses, contributions grow accounts
       yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal);
-      totalIncome = employmentResult.netIncome + totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
+      // totalIncome = passive income only (for consistency with FI phase)
+      // Employment income is tracked separately in employmentResult.netIncome
+      totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
 
       // Add contributions to retirement accounts BEFORE calculating surplus
       if (employmentResult.contributions > 0) {
@@ -1088,8 +1091,8 @@ export function calculateProjection(
         );
       }
 
-      // Calculate surplus (net income - expenses)
-      const surplus = totalIncome - yearExpenses;
+      // Calculate surplus (net employment income + passive income - expenses)
+      const surplus = employmentResult.netIncome + totalIncome - yearExpenses;
 
       if (surplus > 0) {
         // Positive surplus: add to taxable account
