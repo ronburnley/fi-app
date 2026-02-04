@@ -8,7 +8,7 @@ import {
   calculateHomeEquity,
   calculateMortgageBalanceForYear,
 } from './calculations';
-import type { AppState, Asset, EmploymentIncome } from '../types';
+import type { AppState } from '../types';
 
 // Helper to create a minimal valid state for testing
 function createTestState(overrides: Partial<AppState> = {}): AppState {
