@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { RetirementIncomeEditForm } from '../../inputs/RetirementIncomeEditForm';
-import { CurrencyInput, PercentInput, Toggle, Input } from '../../ui';
-import type { EmploymentIncome, RetirementIncome } from '../../../types';
+import { CurrencyInput, PercentInput, Toggle, Input, Select } from '../../ui';
+import type { EmploymentIncome, RetirementIncome, ContributionAccountType, AccountOwner } from '../../../types';
 
 function formatCurrencyCompact(n: number): string {
   return n.toLocaleString('en-US', {
@@ -16,32 +16,62 @@ function formatCurrencyCompact(n: number): string {
 
 export function IncomeStep() {
   const { state, dispatch } = useApp();
-  const { income, profile } = state;
+  const { income, profile, assets } = state;
   const isMarried = profile.filingStatus === 'married';
+
+  // Get retirement accounts filtered by owner for contribution destination options
+  const getRetirementAccountsForOwner = (owner: AccountOwner) => {
+    return assets.accounts.filter(
+      (a) => (a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa') &&
+        (a.owner === owner || a.owner === 'joint')
+    );
+  };
+
+  const selfRetirementAccounts = useMemo(() => getRetirementAccountsForOwner('self'), [assets.accounts]);
+  const spouseRetirementAccounts = useMemo(() => getRetirementAccountsForOwner('spouse'), [assets.accounts]);
 
   const [hasEmployment, setHasEmployment] = useState(!!income.employment);
   const [hasSpouseEmployment, setHasSpouseEmployment] = useState(!!income.spouseEmployment);
   const [editingRetirementIncome, setEditingRetirementIncome] = useState<RetirementIncome | null>(null);
   const [isAddingRetirementIncome, setIsAddingRetirementIncome] = useState(false);
 
+  // Helper to find default contribution destination
+  const findDefaultContributionAccount = (accounts: typeof selfRetirementAccounts) => {
+    // Prefer traditional 401k, then any traditional, then first retirement account
+    const traditional401k = accounts.find(a => a.type === 'traditional' && a.is401k);
+    if (traditional401k) return traditional401k.id;
+    const traditional = accounts.find(a => a.type === 'traditional');
+    if (traditional) return traditional.id;
+    if (accounts.length > 0) return accounts[0].id;
+    return undefined;
+  };
+
   // Local state for employment fields
-  const [selfEmployment, setSelfEmployment] = useState<EmploymentIncome>(
-    income.employment ?? {
+  const [selfEmployment, setSelfEmployment] = useState<EmploymentIncome>(() => {
+    const existing = income.employment;
+    if (existing) return existing;
+    return {
       annualGrossIncome: 150000,
       annualContributions: 23000,
       endAge: 55,
       effectiveTaxRate: 0.28,
-    }
-  );
+      contributionAccountId: findDefaultContributionAccount(selfRetirementAccounts),
+      contributionType: 'traditional',
+    };
+  });
 
-  const [spouseEmployment, setSpouseEmployment] = useState<EmploymentIncome>(
-    income.spouseEmployment ?? {
+  const [spouseEmployment, setSpouseEmployment] = useState<EmploymentIncome>(() => {
+    const existing = income.spouseEmployment;
+    if (existing) return existing;
+    return {
       annualGrossIncome: 100000,
       annualContributions: 15000,
       endAge: 55,
       effectiveTaxRate: 0.25,
-    }
-  );
+      contributionAccountId: findDefaultContributionAccount(spouseRetirementAccounts),
+      contributionType: 'traditional',
+    };
+  });
 
   // Toggle employment on/off
   const toggleEmployment = (enabled: boolean) => {
@@ -63,7 +93,7 @@ export function IncomeStep() {
   };
 
   // Update self employment field
-  const updateSelfField = (field: keyof EmploymentIncome, value: number) => {
+  const updateSelfField = (field: keyof EmploymentIncome, value: number | string | undefined) => {
     const updated = { ...selfEmployment, [field]: value };
     setSelfEmployment(updated);
     if (hasEmployment) {
@@ -72,13 +102,107 @@ export function IncomeStep() {
   };
 
   // Update spouse employment field
-  const updateSpouseField = (field: keyof EmploymentIncome, value: number) => {
+  const updateSpouseField = (field: keyof EmploymentIncome, value: number | string | undefined) => {
     const updated = { ...spouseEmployment, [field]: value };
     setSpouseEmployment(updated);
     if (hasSpouseEmployment) {
       dispatch({ type: 'UPDATE_SPOUSE_EMPLOYMENT', payload: updated });
     }
   };
+
+  // Handle contribution destination change for self
+  const handleSelfContributionDestinationChange = (value: string) => {
+    if (value === 'create-traditional') {
+      updateSelfField('contributionType', 'traditional' as ContributionAccountType);
+      updateSelfField('contributionAccountId', undefined);
+    } else if (value === 'create-roth') {
+      updateSelfField('contributionType', 'roth' as ContributionAccountType);
+      updateSelfField('contributionAccountId', undefined);
+    } else if (value === 'split') {
+      updateSelfField('contributionType', 'mixed' as ContributionAccountType);
+      updateSelfField('contributionAccountId', undefined);
+    } else {
+      // Existing account selected
+      const updated = {
+        ...selfEmployment,
+        contributionAccountId: value,
+        contributionType: undefined
+      };
+      setSelfEmployment(updated);
+      if (hasEmployment) {
+        dispatch({ type: 'UPDATE_EMPLOYMENT', payload: updated });
+      }
+    }
+  };
+
+  // Handle contribution destination change for spouse
+  const handleSpouseContributionDestinationChange = (value: string) => {
+    if (value === 'create-traditional') {
+      updateSpouseField('contributionType', 'traditional' as ContributionAccountType);
+      updateSpouseField('contributionAccountId', undefined);
+    } else if (value === 'create-roth') {
+      updateSpouseField('contributionType', 'roth' as ContributionAccountType);
+      updateSpouseField('contributionAccountId', undefined);
+    } else if (value === 'split') {
+      updateSpouseField('contributionType', 'mixed' as ContributionAccountType);
+      updateSpouseField('contributionAccountId', undefined);
+    } else {
+      // Existing account selected
+      const updated = {
+        ...spouseEmployment,
+        contributionAccountId: value,
+        contributionType: undefined
+      };
+      setSpouseEmployment(updated);
+      if (hasSpouseEmployment) {
+        dispatch({ type: 'UPDATE_SPOUSE_EMPLOYMENT', payload: updated });
+      }
+    }
+  };
+
+  // Get current contribution destination value for dropdown
+  const getSelfContributionDestination = (): string => {
+    if (selfEmployment.contributionAccountId) {
+      return selfEmployment.contributionAccountId;
+    }
+    if (selfEmployment.contributionType === 'mixed') return 'split';
+    if (selfEmployment.contributionType === 'roth') return 'create-roth';
+    return 'create-traditional';
+  };
+
+  const getSpouseContributionDestination = (): string => {
+    if (spouseEmployment.contributionAccountId) {
+      return spouseEmployment.contributionAccountId;
+    }
+    if (spouseEmployment.contributionType === 'mixed') return 'split';
+    if (spouseEmployment.contributionType === 'roth') return 'create-roth';
+    return 'create-traditional';
+  };
+
+  // Build contribution destination options
+  const buildContributionOptions = (accounts: typeof selfRetirementAccounts, ownerLabel: string) => {
+    const options = accounts.map(a => ({
+      value: a.id,
+      label: a.name,
+    }));
+
+    return [
+      ...options,
+      { value: 'create-traditional', label: `Create ${ownerLabel} Traditional 401(k)` },
+      { value: 'create-roth', label: `Create ${ownerLabel} Roth 401(k)` },
+      { value: 'split', label: 'Split across all retirement accounts' },
+    ];
+  };
+
+  const selfContributionOptions = useMemo(
+    () => buildContributionOptions(selfRetirementAccounts, ''),
+    [selfRetirementAccounts]
+  );
+
+  const spouseContributionOptions = useMemo(
+    () => buildContributionOptions(spouseRetirementAccounts, "Spouse's"),
+    [spouseRetirementAccounts]
+  );
 
   // Retirement income handlers
   const handleAddRetirementIncome = (ri: RetirementIncome) => {
@@ -148,6 +272,15 @@ export function IncomeStep() {
                     hint="401k, IRA, HSA"
                   />
                 </div>
+                {selfEmployment.annualContributions > 0 && (
+                  <Select
+                    label="Contribution Destination"
+                    value={getSelfContributionDestination()}
+                    onChange={(value) => handleSelfContributionDestinationChange(String(value))}
+                    options={selfContributionOptions}
+                    hint="Where contributions are deposited"
+                  />
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <Input
                     label="Retirement Age"
@@ -196,6 +329,15 @@ export function IncomeStep() {
                       hint="401k, IRA, HSA"
                     />
                   </div>
+                  {spouseEmployment.annualContributions > 0 && (
+                    <Select
+                      label="Contribution Destination"
+                      value={getSpouseContributionDestination()}
+                      onChange={(value) => handleSpouseContributionDestinationChange(String(value))}
+                      options={spouseContributionOptions}
+                      hint="Where contributions are deposited"
+                    />
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <Input
                       label="Spouse Retirement Age"

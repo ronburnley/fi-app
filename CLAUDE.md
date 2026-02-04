@@ -673,6 +673,45 @@ When building this app:
 
 ## Changelog
 
+### v5.1 - 2026-02-04 - Contribution Linking & Test Suite
+
+**New Features:**
+- Employment contributions now link to specific asset accounts
+- Auto-create 401(k)/Roth/HSA accounts when contribution destination doesn't exist
+- Contribution destination dropdown in Income wizard step
+- Dev bypass mode for local development without Supabase authentication
+- Comprehensive unit test suite with Vitest (32 tests)
+
+**Data Model Changes:**
+- Added `ContributionAccountType` type: `'traditional' | 'roth' | 'hsa' | 'mixed'`
+- Added `contributionAccountId` to `EmploymentIncome` - links to specific account for contributions
+- Added `contributionType` to `EmploymentIncome` - type for auto-creation (default: 'traditional')
+
+**UI Changes:**
+- Contribution Destination dropdown appears when employment contributions > 0
+- Options include existing retirement accounts (filtered by owner) and create-new options
+- "Split across retirement accounts" option preserves proportional distribution behavior
+
+**Calculation Changes:**
+- `addContributionsToAccounts()` now supports linked accounts and mixed distribution
+- When `contributionAccountId` is set, all contributions go to that specific account
+- When `contributionType` is 'mixed', uses proportional distribution across retirement accounts
+- Surplus income continues to go to first taxable account
+
+**New Files:**
+- `vitest.config.ts` - Vitest test configuration
+- `src/test/setup.ts` - Test setup with jest-dom
+- `src/utils/calculations.test.ts` - 32 unit tests for calculation engine
+
+**Development:**
+- Added `VITE_DEV_BYPASS_AUTH` environment variable for local testing
+- Dev bypass mode uses localStorage instead of Supabase
+- Mock user provided when bypass is enabled
+
+**Migration:**
+- Existing employment data with contributions auto-links to best matching retirement account
+- Falls back to undefined (auto-create on next update) if no match found
+
 ### v5.0 - 2026-02-03 - Supabase Authentication & Cloud Sync
 
 **Major Change:**

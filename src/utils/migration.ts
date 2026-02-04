@@ -9,6 +9,8 @@ import type {
   MortgageDetails,
   LegacyMortgage,
   HomeExpense,
+  Income,
+  EmploymentIncome,
 } from '../types';
 
 // Generate a simple UUID
@@ -226,6 +228,97 @@ export function migrateHomeExpense(home: HomeExpense & { mortgage?: LegacyMortga
   return {
     ...home,
     mortgage: migrateLegacyMortgage(home.mortgage as LegacyMortgage),
+  };
+}
+
+// Check if employment income needs contribution linking
+export function needsEmploymentContributionMigration(employment: EmploymentIncome | undefined): boolean {
+  if (!employment) return false;
+  // Needs migration if has contributions but no link and no type set
+  return (
+    employment.annualContributions > 0 &&
+    !employment.contributionAccountId &&
+    !employment.contributionType
+  );
+}
+
+// Find the best matching account for employment contributions
+function findBestContributionAccount(
+  accounts: Asset[],
+  owner: AccountOwner
+): string | undefined {
+  // Filter accounts by owner
+  const ownerAccounts = accounts.filter(
+    (a) => a.owner === owner || a.owner === 'joint'
+  );
+
+  // Priority: traditional 401k > traditional IRA > roth 401k > roth IRA > any retirement
+  const traditional401k = ownerAccounts.find(
+    (a) => a.type === 'traditional' && a.is401k
+  );
+  if (traditional401k) return traditional401k.id;
+
+  const traditional = ownerAccounts.find((a) => a.type === 'traditional');
+  if (traditional) return traditional.id;
+
+  const roth401k = ownerAccounts.find((a) => a.type === 'roth' && a.is401k);
+  if (roth401k) return roth401k.id;
+
+  const roth = ownerAccounts.find((a) => a.type === 'roth');
+  if (roth) return roth.id;
+
+  const hsa = ownerAccounts.find((a) => a.type === 'hsa');
+  if (hsa) return hsa.id;
+
+  return undefined;
+}
+
+// Migrate employment income to link contributions to accounts
+export function migrateEmploymentContributions(
+  income: Income,
+  accounts: Asset[]
+): Income {
+  let updatedEmployment = income.employment;
+  let updatedSpouseEmployment = income.spouseEmployment;
+
+  // Migrate self employment
+  if (needsEmploymentContributionMigration(income.employment)) {
+    const bestAccount = findBestContributionAccount(accounts, 'self');
+    if (bestAccount) {
+      updatedEmployment = {
+        ...income.employment!,
+        contributionAccountId: bestAccount,
+      };
+    } else {
+      // No matching account found, set type for auto-creation
+      updatedEmployment = {
+        ...income.employment!,
+        contributionType: 'traditional',
+      };
+    }
+  }
+
+  // Migrate spouse employment
+  if (needsEmploymentContributionMigration(income.spouseEmployment)) {
+    const bestAccount = findBestContributionAccount(accounts, 'spouse');
+    if (bestAccount) {
+      updatedSpouseEmployment = {
+        ...income.spouseEmployment!,
+        contributionAccountId: bestAccount,
+      };
+    } else {
+      // No matching account found, set type for auto-creation
+      updatedSpouseEmployment = {
+        ...income.spouseEmployment!,
+        contributionType: 'traditional',
+      };
+    }
+  }
+
+  return {
+    ...income,
+    employment: updatedEmployment,
+    spouseEmployment: updatedSpouseEmployment,
   };
 }
 

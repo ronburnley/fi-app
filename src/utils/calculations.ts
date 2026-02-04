@@ -636,7 +636,9 @@ interface EmploymentIncomeResult {
   grossIncome: number;
   netIncome: number;
   tax: number;
-  contributions: number;
+  contributions: number;        // Total contributions (self + spouse)
+  selfContributions: number;    // Self contributions only
+  spouseContributions: number;  // Spouse contributions only
 }
 
 /**
@@ -651,23 +653,25 @@ function calculateEmploymentIncome(
   filingStatus: 'single' | 'married'
 ): EmploymentIncomeResult {
   let grossIncome = 0;
-  let contributions = 0;
+  let selfContributions = 0;
+  let spouseContributions = 0;
   let tax = 0;
 
   // Self employment income
   if (selfEmployment && selfAge < selfEmployment.endAge) {
     grossIncome += selfEmployment.annualGrossIncome;
-    contributions += selfEmployment.annualContributions;
+    selfContributions = selfEmployment.annualContributions;
     tax += selfEmployment.annualGrossIncome * selfEmployment.effectiveTaxRate;
   }
 
   // Spouse employment income
   if (filingStatus === 'married' && spouseEmployment && spouseAge !== undefined && spouseAge < spouseEmployment.endAge) {
     grossIncome += spouseEmployment.annualGrossIncome;
-    contributions += spouseEmployment.annualContributions;
+    spouseContributions = spouseEmployment.annualContributions;
     tax += spouseEmployment.annualGrossIncome * spouseEmployment.effectiveTaxRate;
   }
 
+  const contributions = selfContributions + spouseContributions;
   // Net = gross - tax - contributions (contributions go to accounts, not spending)
   const netIncome = grossIncome - tax - contributions;
 
@@ -676,75 +680,110 @@ function calculateEmploymentIncome(
     netIncome,
     tax,
     contributions,
+    selfContributions,
+    spouseContributions,
   };
 }
 
 /**
- * Add contributions to matching accounts based on type
- * Distributes contributions proportionally to existing traditional/roth/HSA accounts
+ * Add contributions to specific linked accounts or distribute proportionally
+ * If contributionAccountId is set, add all contributions to that account
+ * If contributionType is 'mixed', distribute proportionally to all retirement accounts
+ * Otherwise, fall back to proportional distribution
  */
 function addContributionsToAccounts(
   assetBalanceMap: Map<string, { balance: number; costBasis?: number }>,
   assets: Asset[],
-  contributions: number
+  selfContributions: number,
+  spouseContributions: number,
+  selfEmployment: EmploymentIncome | undefined,
+  spouseEmployment: EmploymentIncome | undefined
 ): Map<string, { balance: number; costBasis?: number }> {
-  if (contributions <= 0) return assetBalanceMap;
+  if (selfContributions <= 0 && spouseContributions <= 0) return assetBalanceMap;
 
   const newMap = new Map(assetBalanceMap);
 
-  // Find retirement accounts (traditional, roth, hsa)
-  const retirementAccounts = assets.filter(
-    (a) => a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa'
-  );
+  // Helper to add contributions to a specific account
+  const addToAccount = (accountId: string, amount: number) => {
+    const balanceInfo = newMap.get(accountId);
+    if (balanceInfo) {
+      newMap.set(accountId, {
+        ...balanceInfo,
+        balance: balanceInfo.balance + amount,
+      });
+    }
+  };
 
-  if (retirementAccounts.length === 0) {
-    // No retirement accounts - add to taxable or cash
-    const taxableAccount = assets.find((a) => a.type === 'taxable');
-    const cashAccount = assets.find((a) => a.type === 'cash');
-    const targetAccount = taxableAccount || cashAccount;
+  // Helper to distribute contributions proportionally across retirement accounts
+  const distributeProportionally = (
+    contributions: number,
+    ownerFilter: (a: Asset) => boolean
+  ) => {
+    const retirementAccounts = assets.filter(
+      (a) => (a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa') && ownerFilter(a)
+    );
 
-    if (targetAccount) {
-      const balanceInfo = newMap.get(targetAccount.id);
-      if (balanceInfo) {
-        newMap.set(targetAccount.id, {
-          ...balanceInfo,
-          balance: balanceInfo.balance + contributions,
-        });
+    if (retirementAccounts.length === 0) {
+      // No retirement accounts - add to taxable or cash
+      const taxableAccount = assets.find((a) => a.type === 'taxable' && ownerFilter(a));
+      const cashAccount = assets.find((a) => a.type === 'cash');
+      const targetAccount = taxableAccount || cashAccount;
+      if (targetAccount) {
+        addToAccount(targetAccount.id, contributions);
+      }
+      return;
+    }
+
+    // Get total balance of retirement accounts for proportional distribution
+    const totalRetirementBalance = retirementAccounts.reduce((sum, a) => {
+      const info = assetBalanceMap.get(a.id);
+      return sum + (info?.balance ?? 0);
+    }, 0);
+
+    if (totalRetirementBalance === 0) {
+      // All accounts empty - split evenly
+      const perAccount = contributions / retirementAccounts.length;
+      for (const account of retirementAccounts) {
+        addToAccount(account.id, perAccount);
+      }
+    } else {
+      // Distribute proportionally based on existing balances
+      for (const account of retirementAccounts) {
+        const balanceInfo = newMap.get(account.id);
+        if (balanceInfo) {
+          const proportion = balanceInfo.balance / totalRetirementBalance;
+          const contributionAmount = contributions * proportion;
+          addToAccount(account.id, contributionAmount);
+        }
       }
     }
-    return newMap;
+  };
+
+  // Process self contributions
+  if (selfContributions > 0) {
+    if (selfEmployment?.contributionAccountId) {
+      // Add all to linked account
+      addToAccount(selfEmployment.contributionAccountId, selfContributions);
+    } else if (selfEmployment?.contributionType === 'mixed') {
+      // Distribute proportionally to self/joint accounts
+      distributeProportionally(selfContributions, (a) => a.owner === 'self' || a.owner === 'joint');
+    } else {
+      // Fallback: distribute proportionally
+      distributeProportionally(selfContributions, (a) => a.owner === 'self' || a.owner === 'joint');
+    }
   }
 
-  // Get total balance of retirement accounts for proportional distribution
-  const totalRetirementBalance = retirementAccounts.reduce((sum, a) => {
-    const info = assetBalanceMap.get(a.id);
-    return sum + (info?.balance ?? 0);
-  }, 0);
-
-  if (totalRetirementBalance === 0) {
-    // All accounts empty - split evenly
-    const perAccount = contributions / retirementAccounts.length;
-    for (const account of retirementAccounts) {
-      const balanceInfo = newMap.get(account.id);
-      if (balanceInfo) {
-        newMap.set(account.id, {
-          ...balanceInfo,
-          balance: balanceInfo.balance + perAccount,
-        });
-      }
-    }
-  } else {
-    // Distribute proportionally based on existing balances
-    for (const account of retirementAccounts) {
-      const balanceInfo = newMap.get(account.id);
-      if (balanceInfo) {
-        const proportion = balanceInfo.balance / totalRetirementBalance;
-        const contributionAmount = contributions * proportion;
-        newMap.set(account.id, {
-          ...balanceInfo,
-          balance: balanceInfo.balance + contributionAmount,
-        });
-      }
+  // Process spouse contributions
+  if (spouseContributions > 0) {
+    if (spouseEmployment?.contributionAccountId) {
+      // Add all to linked account
+      addToAccount(spouseEmployment.contributionAccountId, spouseContributions);
+    } else if (spouseEmployment?.contributionType === 'mixed') {
+      // Distribute proportionally to spouse/joint accounts
+      distributeProportionally(spouseContributions, (a) => a.owner === 'spouse' || a.owner === 'joint');
+    } else {
+      // Fallback: distribute proportionally
+      distributeProportionally(spouseContributions, (a) => a.owner === 'spouse' || a.owner === 'joint');
     }
   }
 
@@ -1080,7 +1119,10 @@ export function calculateProjection(
         assetBalanceMap = addContributionsToAccounts(
           assetBalanceMap,
           assets.accounts,
-          employmentResult.contributions
+          employmentResult.selfContributions,
+          employmentResult.spouseContributions,
+          income.employment,
+          income.spouseEmployment
         );
         // Update aggregated balances
         balances = aggregateBalances(

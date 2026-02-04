@@ -1,6 +1,9 @@
 import { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
-import type { AppState, AppAction, WhatIfAdjustments, SyncStatus } from '../types';
+import type { AppState, AppAction, WhatIfAdjustments, SyncStatus, Asset, AccountType } from '../types';
 import { DEFAULT_STATE, DEFAULT_WHAT_IF, DEFAULT_INCOME, STORAGE_KEY } from '../constants/defaults';
+
+// Check if we should bypass auth for local development
+const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
 import {
   isLegacyAssetFormat,
   migrateLegacyAssets,
@@ -8,6 +11,9 @@ import {
   migrateLegacyExpenses,
   needsMortgageMigration,
   migrateHomeExpense,
+  generateId,
+  needsEmploymentContributionMigration,
+  migrateEmploymentContributions,
 } from '../utils/migration';
 import { calculateAchievableFIAge } from '../utils/calculations';
 import { useAuth } from './AuthContext';
@@ -66,14 +72,42 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
 
-    case 'REMOVE_ASSET':
+    case 'REMOVE_ASSET': {
+      const removedId = action.payload;
+
+      // Clear contributionAccountId if it references the removed asset
+      let updatedEmployment = state.income.employment;
+      let updatedSpouseEmployment = state.income.spouseEmployment;
+
+      if (updatedEmployment?.contributionAccountId === removedId) {
+        updatedEmployment = {
+          ...updatedEmployment,
+          contributionAccountId: undefined,
+          contributionType: 'traditional', // Reset to default for auto-create
+        };
+      }
+
+      if (updatedSpouseEmployment?.contributionAccountId === removedId) {
+        updatedSpouseEmployment = {
+          ...updatedSpouseEmployment,
+          contributionAccountId: undefined,
+          contributionType: 'traditional', // Reset to default for auto-create
+        };
+      }
+
       return {
         ...state,
         assets: {
           ...state.assets,
-          accounts: state.assets.accounts.filter((asset) => asset.id !== action.payload),
+          accounts: state.assets.accounts.filter((asset) => asset.id !== removedId),
+        },
+        income: {
+          ...state.income,
+          employment: updatedEmployment,
+          spouseEmployment: updatedSpouseEmployment,
         },
       };
+    }
 
     case 'UPDATE_INCOME':
       return {
@@ -81,23 +115,111 @@ function appReducer(state: AppState, action: AppAction): AppState {
         income: { ...state.income, ...action.payload },
       };
 
-    case 'UPDATE_EMPLOYMENT':
-      return {
-        ...state,
-        income: {
-          ...state.income,
-          employment: action.payload,
-        },
-      };
+    case 'UPDATE_EMPLOYMENT': {
+      const employment = action.payload;
+      let newAccounts = state.assets.accounts;
+      let updatedEmployment = employment;
 
-    case 'UPDATE_SPOUSE_EMPLOYMENT':
+      // Auto-create account if contributionType is set but no contributionAccountId
+      if (employment && employment.annualContributions > 0 &&
+          employment.contributionType &&
+          employment.contributionType !== 'mixed' &&
+          !employment.contributionAccountId) {
+        // Check if a matching account already exists
+        const existingAccount = state.assets.accounts.find(
+          (a) => a.type === employment.contributionType &&
+                 (a.owner === 'self' || a.owner === 'joint')
+        );
+
+        if (existingAccount) {
+          // Link to existing account
+          updatedEmployment = { ...employment, contributionAccountId: existingAccount.id };
+        } else {
+          // Create new account
+          const accountType = employment.contributionType as AccountType;
+          const accountName = accountType === 'hsa'
+            ? 'HSA'
+            : `Employment ${accountType === 'roth' ? 'Roth' : 'Traditional'} 401(k)`;
+
+          const newAccount: Asset = {
+            id: generateId(),
+            name: accountName,
+            type: accountType,
+            owner: 'self',
+            balance: 0,
+            is401k: accountType !== 'hsa',
+          };
+
+          newAccounts = [...state.assets.accounts, newAccount];
+          updatedEmployment = { ...employment, contributionAccountId: newAccount.id };
+        }
+      }
+
       return {
         ...state,
+        assets: {
+          ...state.assets,
+          accounts: newAccounts,
+        },
         income: {
           ...state.income,
-          spouseEmployment: action.payload,
+          employment: updatedEmployment,
         },
       };
+    }
+
+    case 'UPDATE_SPOUSE_EMPLOYMENT': {
+      const employment = action.payload;
+      let newAccounts = state.assets.accounts;
+      let updatedEmployment = employment;
+
+      // Auto-create account if contributionType is set but no contributionAccountId
+      if (employment && employment.annualContributions > 0 &&
+          employment.contributionType &&
+          employment.contributionType !== 'mixed' &&
+          !employment.contributionAccountId) {
+        // Check if a matching account already exists
+        const existingAccount = state.assets.accounts.find(
+          (a) => a.type === employment.contributionType &&
+                 a.owner === 'spouse'
+        );
+
+        if (existingAccount) {
+          // Link to existing account
+          updatedEmployment = { ...employment, contributionAccountId: existingAccount.id };
+        } else {
+          // Create new account
+          const accountType = employment.contributionType as AccountType;
+          const accountName = accountType === 'hsa'
+            ? "Spouse's HSA"
+            : `Spouse's ${accountType === 'roth' ? 'Roth' : 'Traditional'} 401(k)`;
+
+          const newAccount: Asset = {
+            id: generateId(),
+            name: accountName,
+            type: accountType,
+            owner: 'spouse',
+            balance: 0,
+            is401k: accountType !== 'hsa',
+          };
+
+          newAccounts = [...state.assets.accounts, newAccount];
+          updatedEmployment = { ...employment, contributionAccountId: newAccount.id };
+        }
+      }
+
+      return {
+        ...state,
+        assets: {
+          ...state.assets,
+          accounts: newAccounts,
+        },
+        income: {
+          ...state.income,
+          spouseEmployment: updatedEmployment,
+        },
+      };
+    }
 
     case 'ADD_RETIREMENT_INCOME':
       return {
@@ -316,10 +438,24 @@ function migrateData(data: AppState): AppState {
     };
   }
 
+  // Migrate employment contribution linking
+  let migratedIncome = data.income;
+  if (
+    migratedIncome &&
+    (needsEmploymentContributionMigration(migratedIncome.employment) ||
+     needsEmploymentContributionMigration(migratedIncome.spouseEmployment))
+  ) {
+    migratedIncome = migrateEmploymentContributions(
+      migratedIncome,
+      migratedAssets?.accounts || []
+    );
+  }
+
   return mergeWithDefaults({
     ...data,
     assets: migratedAssets,
     expenses: migratedExpenses,
+    income: migratedIncome,
   });
 }
 
@@ -344,7 +480,7 @@ export function AppProvider({ children }: AppProviderProps) {
   const { assets, income, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
   const { currentAge, lifeExpectancy, filingStatus, spouseAge, state: profileState, targetFIAge } = profile;
 
-  // Load plan from Supabase when user changes
+  // Load plan from Supabase (or localStorage in dev bypass mode)
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
@@ -353,6 +489,26 @@ export function AppProvider({ children }: AppProviderProps) {
 
     const loadPlan = async () => {
       setIsLoading(true);
+
+      // In dev bypass mode, use localStorage instead of Supabase
+      if (DEV_BYPASS_AUTH) {
+        console.log('[AppContext] Dev bypass mode - loading from localStorage');
+        const localData = localStorage.getItem(STORAGE_KEY);
+        if (localData) {
+          try {
+            const parsed = JSON.parse(localData);
+            const migratedState = migrateData(parsed);
+            dispatch({ type: 'LOAD_STATE', payload: migratedState });
+          } catch (err) {
+            console.error('Failed to parse localStorage data:', err);
+          }
+        }
+        setPlanId('dev-plan');
+        isInitialLoad.current = false;
+        setIsLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('financial_plans')
@@ -511,7 +667,7 @@ export function AppProvider({ children }: AppProviderProps) {
     whatIf,
   ]);
 
-  // Auto-save to Supabase when state changes (debounced)
+  // Auto-save to Supabase (or localStorage in dev bypass mode) when state changes
   useEffect(() => {
     // Skip saving during initial load or if no plan exists
     if (isInitialLoad.current || !planId || !user) return;
@@ -525,6 +681,19 @@ export function AppProvider({ children }: AppProviderProps) {
 
     // Debounce saves by 1 second
     saveTimeoutRef.current = setTimeout(async () => {
+      // In dev bypass mode, save to localStorage
+      if (DEV_BYPASS_AUTH) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          setSyncStatus('saved');
+          setTimeout(() => setSyncStatus('idle'), 2000);
+        } catch (err) {
+          console.error('Failed to save to localStorage:', err);
+          setSyncStatus('error');
+        }
+        return;
+      }
+
       try {
         const { error } = await supabase
           .from('financial_plans')
