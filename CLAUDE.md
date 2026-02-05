@@ -678,6 +678,21 @@ When building this app:
 
 ## Changelog
 
+### v5.3 - 2026-02-05 - Sign-In Modal
+
+**UI Changes:**
+- "Sign in to sync" header button now opens a modal instead of redirecting directly to Google OAuth
+- Modal includes: title, description, Google sign-in button, error handling, privacy note
+- Click overlay or X button to dismiss
+- Structured for future addition of email/password sign-in
+
+**New Files:**
+- `src/components/auth/SignInModal.tsx` - Sign-in modal component
+
+**Files Modified:**
+- `src/components/layout/Header.tsx` - Replaced inline OAuth call with modal trigger
+- `src/components/auth/index.ts` - Added SignInModal export
+
 ### v5.2 - 2026-02-05 - Guest Mode & Landing Page
 
 **Major Change:**
