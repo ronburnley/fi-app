@@ -464,7 +464,7 @@ interface AppProviderProps {
 }
 
 export function AppProvider({ children }: AppProviderProps) {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [state, dispatch] = useReducer(appReducer, DEFAULT_STATE);
   const [whatIf, setWhatIf] = useState<WhatIfAdjustments>(DEFAULT_WHAT_IF);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
@@ -480,9 +480,10 @@ export function AppProvider({ children }: AppProviderProps) {
   const { assets, income, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
   const { currentAge, lifeExpectancy, filingStatus, spouseAge, state: profileState, targetFIAge } = profile;
 
-  // Load plan from Supabase (or localStorage in dev bypass mode)
+  // Load plan from Supabase (or localStorage in dev bypass/guest mode)
   useEffect(() => {
-    if (!user) {
+    // Need either user or guest mode to proceed
+    if (!user && !isGuest) {
       setIsLoading(false);
       return;
     }
@@ -490,9 +491,9 @@ export function AppProvider({ children }: AppProviderProps) {
     const loadPlan = async () => {
       setIsLoading(true);
 
-      // In dev bypass mode, use localStorage instead of Supabase
-      if (DEV_BYPASS_AUTH) {
-        console.log('[AppContext] Dev bypass mode - loading from localStorage');
+      // In dev bypass mode or guest mode, use localStorage instead of Supabase
+      if (DEV_BYPASS_AUTH || isGuest) {
+        console.log(`[AppContext] ${DEV_BYPASS_AUTH ? 'Dev bypass' : 'Guest'} mode - loading from localStorage`);
         const localData = localStorage.getItem(STORAGE_KEY);
         if (localData) {
           try {
@@ -503,7 +504,7 @@ export function AppProvider({ children }: AppProviderProps) {
             console.error('Failed to parse localStorage data:', err);
           }
         }
-        setPlanId('dev-plan');
+        setPlanId(isGuest ? 'guest-plan' : 'dev-plan');
         isInitialLoad.current = false;
         setIsLoading(false);
         return;
@@ -513,7 +514,7 @@ export function AppProvider({ children }: AppProviderProps) {
         const { data, error } = await supabase
           .from('financial_plans')
           .select('*')
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .single();
 
         if (error && error.code !== 'PGRST116') {
@@ -540,7 +541,7 @@ export function AppProvider({ children }: AppProviderProps) {
             const { data: newPlan, error: createError } = await supabase
               .from('financial_plans')
               .insert({
-                user_id: user.id,
+                user_id: user!.id,
                 name: 'My Plan',
                 data: DEFAULT_STATE,
               })
@@ -563,7 +564,7 @@ export function AppProvider({ children }: AppProviderProps) {
     };
 
     loadPlan();
-  }, [user]);
+  }, [user, isGuest]);
 
   // Accept migration from localStorage
   const acceptMigration = useCallback(async () => {
@@ -667,10 +668,13 @@ export function AppProvider({ children }: AppProviderProps) {
     whatIf,
   ]);
 
-  // Auto-save to Supabase (or localStorage in dev bypass mode) when state changes
+  // Auto-save to Supabase (or localStorage in dev bypass/guest mode) when state changes
   useEffect(() => {
     // Skip saving during initial load or if no plan exists
-    if (isInitialLoad.current || !planId || !user) return;
+    // In guest mode, we don't have a user but still need planId
+    if (isInitialLoad.current || !planId) return;
+    // Need user for cloud save, but guest mode saves locally
+    if (!user && !isGuest) return;
 
     // Clear any pending save
     if (saveTimeoutRef.current) {
@@ -681,8 +685,8 @@ export function AppProvider({ children }: AppProviderProps) {
 
     // Debounce saves by 1 second
     saveTimeoutRef.current = setTimeout(async () => {
-      // In dev bypass mode, save to localStorage
-      if (DEV_BYPASS_AUTH) {
+      // In dev bypass mode or guest mode, save to localStorage
+      if (DEV_BYPASS_AUTH || isGuest) {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
           setSyncStatus('saved');
@@ -720,7 +724,7 @@ export function AppProvider({ children }: AppProviderProps) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [state, planId, user]);
+  }, [state, planId, user, isGuest]);
 
   return (
     <AppContext.Provider

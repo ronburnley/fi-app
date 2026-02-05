@@ -7,7 +7,7 @@ import { MigrationPrompt } from './components/auth/MigrationPrompt';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 
 function AppContent() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isGuest } = useAuth();
   const { isLoading: dataLoading, needsMigration, acceptMigration, declineMigration } = useApp();
 
   // Show loading while checking auth
@@ -15,8 +15,8 @@ function AppContent() {
     return <LoadingScreen message="Checking authentication..." />;
   }
 
-  // Show login page if not authenticated
-  if (!user) {
+  // Show login page if not authenticated and not in guest mode
+  if (!user && !isGuest) {
     return <LoginPage />;
   }
 
@@ -25,8 +25,8 @@ function AppContent() {
     return <LoadingScreen message="Loading your plan..." />;
   }
 
-  // Show migration prompt if localStorage data exists
-  if (needsMigration) {
+  // Show migration prompt if localStorage data exists (only for authenticated users)
+  if (needsMigration && user) {
     return (
       <MigrationPrompt
         onAccept={acceptMigration}

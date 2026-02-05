@@ -397,13 +397,15 @@ Note: FI age is no longer adjustable via slider - it's calculated based on input
 
 ```
 App
-├── AuthProvider               # Supabase auth state
-├── AppProvider                # App state + Supabase sync
+├── AuthProvider               # Supabase auth state + guest mode
+├── AppProvider                # App state + sync (Supabase or localStorage)
+├── LoginPage                  # Landing page (if !user && !isGuest)
 ├── Header
 │   ├── Logo
 │   ├── FIStatusIndicator      # Center - shows years to FI
-│   ├── SyncStatusIndicator    # Saving/Saved/Error
-│   └── UserMenu               # Avatar + logout
+│   ├── SyncStatusIndicator    # Saving/Saved/Error (authenticated only)
+│   ├── SignInToSync           # Link for guest users
+│   └── UserMenu               # Avatar + logout (authenticated only)
 ├── MainLayout
 │   ├── InputPanel
 │   │   ├── ProfileSection
@@ -434,10 +436,13 @@ All inputs should update projections immediately. Use debouncing (300ms) on text
 - Show inline validation errors
 
 ### Authentication & Sync
-- **Sign In**: Google OAuth via Supabase
-- **Auto-Save**: Changes saved to cloud automatically (1s debounce)
-- **Sync Status**: Header shows Saving.../Saved/Error indicator
-- **Migration**: First-time users with localStorage data get import prompt
+- **Landing Page**: Users choose between guest mode or Google sign-in
+- **Guest Mode**: No account required, data stored in localStorage
+- **Sign In**: Google OAuth via Supabase for cloud sync
+- **Auto-Save**: Changes saved automatically (1s debounce) - localStorage for guests, Supabase for authenticated
+- **Sync Status**: Header shows Saving.../Saved/Error indicator (authenticated only)
+- **Guest→Auth Migration**: When guest signs in, localStorage data migrates to cloud
+- **URL Reset**: Add `?reset` to URL to clear guest mode and return to landing page
 
 ### Responsive Behavior
 - Desktop: side-by-side panels
@@ -452,7 +457,7 @@ All inputs should update projections immediately. Use debouncing (300ms) on text
 src/
 ├── components/
 │   ├── auth/                  # Authentication components
-│   │   ├── LoginPage.tsx          # Google sign-in landing page
+│   │   ├── LoginPage.tsx          # Landing page with guest/Google choice
 │   │   └── MigrationPrompt.tsx    # localStorage migration prompt
 │   ├── ui/                    # Reusable primitives
 │   │   ├── Button.tsx
@@ -672,6 +677,35 @@ When building this app:
 ---
 
 ## Changelog
+
+### v5.2 - 2026-02-05 - Guest Mode & Landing Page
+
+**Major Change:**
+Users can now use the app without signing in. A new landing page offers two paths: "Get Started" for guest mode (localStorage) or "Continue with Google" for cloud sync.
+
+**New Features:**
+- Landing page with two entry paths (guest vs authenticated)
+- Guest mode uses localStorage for data persistence
+- Seamless migration from guest to authenticated (existing flow handles it)
+- "Sign in to sync" button in header for guest users
+- URL parameter `?reset` clears guest mode and returns to landing page
+
+**Data Model Changes:**
+- Added `GUEST_MODE_KEY` constant for localStorage flag
+- AuthContext now includes: `isGuest`, `enterGuestMode()`, `exitGuestMode()`
+
+**UI Changes:**
+- New premium landing page design with gradient background
+- Primary green "Get Started" CTA button with glow effect
+- Secondary "Continue with Google" button
+- Header shows "Sign in to sync" link when in guest mode (replaces sync status + user menu)
+- Privacy footer explaining data stays on device
+
+**Behavior:**
+- Guest mode persists across page refreshes (localStorage flag)
+- Signing in auto-exits guest mode and triggers migration if localStorage data exists
+- Signing out returns to landing page (not guest mode)
+- DEV_BYPASS_AUTH still takes precedence for development
 
 ### v5.1 - 2026-02-04 - Contribution Linking & Test Suite
 

@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { GUEST_MODE_KEY } from '../constants/defaults';
 
 // Check if we should bypass auth for local development
 const DEV_BYPASS_AUTH = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true';
@@ -19,8 +20,11 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isGuest: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  enterGuestMode: () => void;
+  exitGuestMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -33,6 +37,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(DEV_BYPASS_AUTH ? MOCK_USER : null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(!DEV_BYPASS_AUTH);
+  const [isGuest, setIsGuest] = useState(() => {
+    // Check for reset parameter to clear guest mode
+    if (typeof window !== 'undefined' && window.location.search.includes('reset')) {
+      localStorage.removeItem(GUEST_MODE_KEY);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+      return false;
+    }
+    // Initialize from localStorage (but DEV_BYPASS_AUTH takes precedence)
+    if (DEV_BYPASS_AUTH) return false;
+    return localStorage.getItem(GUEST_MODE_KEY) === 'true';
+  });
 
   useEffect(() => {
     // Skip auth check in dev bypass mode
@@ -45,6 +61,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      // Auto-exit guest mode if user is authenticated
+      if (session?.user) {
+        setIsGuest(false);
+        localStorage.removeItem(GUEST_MODE_KEY);
+      }
       setLoading(false);
     });
 
@@ -53,6 +74,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        // Auto-exit guest mode when user signs in
+        if (session?.user) {
+          setIsGuest(false);
+          localStorage.removeItem(GUEST_MODE_KEY);
+        }
         setLoading(false);
       }
     );
@@ -79,10 +105,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Sign out error:', error);
       throw error;
     }
+    // Clear guest mode on sign out - return to landing page
+    setIsGuest(false);
+    localStorage.removeItem(GUEST_MODE_KEY);
   };
 
+  const enterGuestMode = useCallback(() => {
+    setIsGuest(true);
+    localStorage.setItem(GUEST_MODE_KEY, 'true');
+  }, []);
+
+  const exitGuestMode = useCallback(() => {
+    setIsGuest(false);
+    localStorage.removeItem(GUEST_MODE_KEY);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{
+      user,
+      session,
+      loading,
+      isGuest,
+      signInWithGoogle,
+      signOut,
+      enterGuestMode,
+      exitGuestMode,
+    }}>
       {children}
     </AuthContext.Provider>
   );
