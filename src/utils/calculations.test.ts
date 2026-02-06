@@ -7,7 +7,6 @@ import {
   calculateRemainingBalance,
   calculateHomeEquity,
   calculateMortgageBalanceForYear,
-  SS_ADJUSTMENT_FACTORS,
   getSSAdjustmentFactor,
   getAdjustedSSBenefit,
 } from './calculations';
