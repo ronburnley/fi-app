@@ -987,6 +987,29 @@ function calculateBaseAnnualSpending(expenses: Expenses, currentYear: number): n
   return total;
 }
 
+// ==================== Social Security Adjustment ====================
+
+/**
+ * SSA adjustment factors based on claiming age relative to FRA (67).
+ * Early claiming at 62 reduces benefit by 30%.
+ * Delayed claiming at 70 increases benefit by 24%.
+ */
+export const SS_ADJUSTMENT_FACTORS: Record<62 | 67 | 70, number> = {
+  62: 0.70,
+  67: 1.00,
+  70: 1.24,
+};
+
+/** Returns the SS benefit multiplier for a given claiming age. */
+export function getSSAdjustmentFactor(startAge: 62 | 67 | 70): number {
+  return SS_ADJUSTMENT_FACTORS[startAge];
+}
+
+/** Returns the adjusted monthly SS benefit based on FRA benefit and claiming age. */
+export function getAdjustedSSBenefit(fraBenefit: number, startAge: 62 | 67 | 70): number {
+  return fraBenefit * getSSAdjustmentFactor(startAge);
+}
+
 export function calculateProjection(
   state: AppState,
   whatIf?: WhatIfAdjustments
@@ -1068,21 +1091,23 @@ export function calculateProjection(
     // Calculate passive income (SS, pension)
     let passiveIncome = 0;
 
-    // Primary Social Security with COLA
+    // Primary Social Security with COLA (monthlyBenefit is FRA amount, adjusted by claiming age)
     if (socialSecurity.include && age >= effectiveSSAge) {
+      const adjustedMonthly = getAdjustedSSBenefit(socialSecurity.monthlyBenefit, effectiveSSAge);
       const yearsSinceStart = age - effectiveSSAge;
       const colaFactor = Math.pow(1 + (socialSecurity.colaRate || 0), yearsSinceStart);
-      passiveIncome += socialSecurity.monthlyBenefit * 12 * colaFactor;
+      passiveIncome += adjustedMonthly * 12 * colaFactor;
     }
 
-    // Spouse Social Security with COLA
+    // Spouse Social Security with COLA (monthlyBenefit is FRA amount, adjusted by claiming age)
     if (profile.filingStatus === 'married' && socialSecurity.spouse?.include && spouseAge !== undefined) {
       const spouseSSAge = whatIf?.spouseSSStartAge ?? socialSecurity.spouse.startAge;
 
       if (spouseAge >= spouseSSAge) {
+        const adjustedMonthly = getAdjustedSSBenefit(socialSecurity.spouse.monthlyBenefit, spouseSSAge);
         const yearsSinceStart = spouseAge - spouseSSAge;
         const colaFactor = Math.pow(1 + (socialSecurity.colaRate || 0), yearsSinceStart);
-        passiveIncome += socialSecurity.spouse.monthlyBenefit * 12 * colaFactor;
+        passiveIncome += adjustedMonthly * 12 * colaFactor;
       }
     }
 

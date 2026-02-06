@@ -678,6 +678,35 @@ When building this app:
 
 ## Changelog
 
+### v5.4 - 2026-02-06 - FRA-Based Social Security Auto-Adjustment
+
+**Major Change:**
+Social Security `monthlyBenefit` is now interpreted as the Full Retirement Age (67) benefit. The app auto-adjusts based on claiming age using standard SSA factors: 62 = 0.70, 67 = 1.00, 70 = 1.24.
+
+**New Features:**
+- `SS_ADJUSTMENT_FACTORS` constant with SSA claiming-age multipliers
+- `getSSAdjustmentFactor(startAge)` and `getAdjustedSSBenefit(fraBenefit, startAge)` utility functions
+- Benefit input auto-adjusts when start age changes (e.g., $2,500 FRA → $1,750 at 62, $3,100 at 70)
+- What-If effective values show adjusted SS benefit when override age differs from stored age
+
+**UI Changes:**
+- SS benefit input displays adjusted amount, reverse-adjusts on edit to store FRA internally
+- Hint shows FRA context when not at age 67 (e.g., "FRA benefit: $2,500/mo")
+- Dropdown labels updated: "Age 62 (early, -30%)", "Age 70 (delayed, +24%)"
+- Same treatment for spouse SS section
+- What-If dropdowns updated with matching labels
+
+**Calculation Changes:**
+- Projection engine applies `getAdjustedSSBenefit()` before COLA for both primary and spouse SS
+- COLA compounds on the adjusted (not FRA) amount, matching real SSA behavior
+- What-If SS age override uses the override age's adjustment factor
+
+**Files Modified:**
+- `src/utils/calculations.ts` - SS adjustment utilities + projection engine update
+- `src/components/inputs/SocialSecuritySection.tsx` - Auto-adjusting benefit input
+- `src/components/inputs/WhatIfSection.tsx` - Updated labels + effective SS benefit display
+- `src/utils/calculations.test.ts` - 11 new tests (43 total)
+
 ### v5.3 - 2026-02-05 - Sign-In Modal
 
 **UI Changes:**

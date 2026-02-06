@@ -7,6 +7,9 @@ import {
   calculateRemainingBalance,
   calculateHomeEquity,
   calculateMortgageBalanceForYear,
+  SS_ADJUSTMENT_FACTORS,
+  getSSAdjustmentFactor,
+  getAdjustedSSBenefit,
 } from './calculations';
 import type { AppState } from '../types';
 
@@ -398,6 +401,152 @@ describe('Social Security COLA', () => {
     // Self: 2500 * 12 = 30000 (year 0)
     // Spouse: 2000 * 12 * 1.02^2 = 24970 (2 years of COLA)
     expect(projections[2].income).toBeCloseTo(30000 + 24970, -1);
+  });
+});
+
+// ==================== Social Security FRA Adjustment ====================
+
+describe('Social Security FRA Adjustment', () => {
+  describe('getSSAdjustmentFactor', () => {
+    it('returns 0.70 for age 62', () => {
+      expect(getSSAdjustmentFactor(62)).toBe(0.70);
+    });
+
+    it('returns 1.00 for age 67', () => {
+      expect(getSSAdjustmentFactor(67)).toBe(1.00);
+    });
+
+    it('returns 1.24 for age 70', () => {
+      expect(getSSAdjustmentFactor(70)).toBe(1.24);
+    });
+  });
+
+  describe('getAdjustedSSBenefit', () => {
+    it('reduces $2,500 FRA benefit to $1,750 at age 62', () => {
+      expect(getAdjustedSSBenefit(2500, 62)).toBe(1750);
+    });
+
+    it('keeps $2,500 FRA benefit unchanged at age 67', () => {
+      expect(getAdjustedSSBenefit(2500, 67)).toBe(2500);
+    });
+
+    it('increases $2,500 FRA benefit to $3,100 at age 70', () => {
+      expect(getAdjustedSSBenefit(2500, 70)).toBe(3100);
+    });
+  });
+
+  describe('projection integration', () => {
+    it('uses adjusted benefit at age 62 in projections', () => {
+      const state = createTestState({
+        profile: { currentAge: 62, targetFIAge: 62, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+        socialSecurity: {
+          include: true,
+          monthlyBenefit: 2500, // FRA benefit
+          startAge: 62,
+          colaRate: 0,
+        },
+        expenses: {
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+        },
+      });
+
+      const projections = calculateProjection(state);
+
+      // Adjusted: 2500 * 0.70 = 1750/mo = 21000/yr
+      expect(projections[0].income).toBeCloseTo(21000, 0);
+    });
+
+    it('uses adjusted benefit at age 70 in projections', () => {
+      const state = createTestState({
+        profile: { currentAge: 70, targetFIAge: 70, lifeExpectancy: 75, state: 'TX', filingStatus: 'single' },
+        socialSecurity: {
+          include: true,
+          monthlyBenefit: 2500, // FRA benefit
+          startAge: 70,
+          colaRate: 0,
+        },
+        expenses: {
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, inflationRate: 0, category: 'living' }],
+        },
+      });
+
+      const projections = calculateProjection(state);
+
+      // Adjusted: 2500 * 1.24 = 3100/mo = 37200/yr
+      expect(projections[0].income).toBeCloseTo(37200, 0);
+    });
+
+    it('applies COLA on adjusted (not FRA) benefit', () => {
+      const state = createTestState({
+        profile: { currentAge: 62, targetFIAge: 62, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+        socialSecurity: {
+          include: true,
+          monthlyBenefit: 2500, // FRA benefit
+          startAge: 62,
+          colaRate: 0.02,
+        },
+        expenses: {
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+        },
+      });
+
+      const projections = calculateProjection(state);
+
+      // Year 0: Adjusted = 1750/mo = 21000/yr (no COLA yet)
+      expect(projections[0].income).toBeCloseTo(21000, 0);
+
+      // Year 3: 21000 * 1.02^3 = 22285
+      expect(projections[3].income).toBeCloseTo(22285, 0);
+    });
+
+    it('applies What-If SS age override with correct adjustment', () => {
+      const state = createTestState({
+        profile: { currentAge: 62, targetFIAge: 62, lifeExpectancy: 75, state: 'TX', filingStatus: 'single' },
+        socialSecurity: {
+          include: true,
+          monthlyBenefit: 2500, // FRA benefit
+          startAge: 67, // Stored age
+          colaRate: 0,
+        },
+        expenses: {
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+        },
+      });
+
+      // Override to age 62 via What-If
+      const projections = calculateProjection(state, { spendingAdjustment: 0, returnAdjustment: 0.06, ssStartAge: 62 });
+
+      // With What-If age 62: adjusted = 2500 * 0.70 = 1750/mo = 21000/yr
+      expect(projections[0].income).toBeCloseTo(21000, 0);
+    });
+
+    it('adjusts spouse SS independently', () => {
+      const state = createTestState({
+        profile: { currentAge: 67, targetFIAge: 67, lifeExpectancy: 75, state: 'TX', filingStatus: 'married', spouseAge: 62 },
+        socialSecurity: {
+          include: true,
+          monthlyBenefit: 2500, // FRA benefit
+          startAge: 67, // Self claims at FRA
+          colaRate: 0,
+          spouse: {
+            include: true,
+            monthlyBenefit: 2000, // Spouse FRA benefit
+            startAge: 62, // Spouse claims early
+          },
+        },
+        expenses: {
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+        },
+      });
+
+      const projections = calculateProjection(state);
+
+      // Year 0 (self 67, spouse 62):
+      // Self: 2500 * 1.00 * 12 = 30000
+      // Spouse: 2000 * 0.70 * 12 = 16800
+      // Total: 46800
+      expect(projections[0].income).toBeCloseTo(46800, 0);
+    });
   });
 });
 

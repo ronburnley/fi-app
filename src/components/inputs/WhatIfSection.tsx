@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Card, Slider, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
 import { useAchievableFI } from '../../hooks/useAchievableFI';
+import { getAdjustedSSBenefit } from '../../utils/calculations';
 import type { Expenses } from '../../types';
 
 // Calculate base annual spending from expense categories
@@ -87,9 +88,9 @@ export function WhatIfSection() {
           value={whatIf.ssStartAge}
           onChange={(value) => setWhatIf({ ...whatIf, ssStartAge: parseInt(value as string) as 62 | 67 | 70 })}
           options={[
-            { value: 62, label: 'Age 62' },
-            { value: 67, label: 'Age 67' },
-            { value: 70, label: 'Age 70' },
+            { value: 62, label: 'Age 62 (early, -30%)' },
+            { value: 67, label: 'Age 67 (full retirement age)' },
+            { value: 70, label: 'Age 70 (delayed, +24%)' },
           ]}
         />
 
@@ -99,9 +100,9 @@ export function WhatIfSection() {
             value={whatIf.spouseSSStartAge ?? state.socialSecurity.spouse.startAge}
             onChange={(value) => setWhatIf({ ...whatIf, spouseSSStartAge: parseInt(value as string) as 62 | 67 | 70 })}
             options={[
-              { value: 62, label: 'Age 62' },
-              { value: 67, label: 'Age 67' },
-              { value: 70, label: 'Age 70' },
+              { value: 62, label: 'Age 62 (early, -30%)' },
+              { value: 67, label: 'Age 67 (full retirement age)' },
+              { value: 70, label: 'Age 70 (delayed, +24%)' },
             ]}
           />
         )}
@@ -116,6 +117,22 @@ export function WhatIfSection() {
                 ${Math.round(baseAnnualSpending * (1 + whatIf.spendingAdjustment)).toLocaleString()}
               </span>
             </div>
+            {state.socialSecurity.include && whatIf.ssStartAge !== state.socialSecurity.startAge && (
+              <div>
+                <span className="text-text-muted">SS Benefit: </span>
+                <span className="text-text-primary tabular-nums">
+                  ${Math.round(getAdjustedSSBenefit(state.socialSecurity.monthlyBenefit, whatIf.ssStartAge)).toLocaleString()}/mo
+                </span>
+              </div>
+            )}
+            {state.socialSecurity.spouse?.include && whatIf.spouseSSStartAge && whatIf.spouseSSStartAge !== state.socialSecurity.spouse.startAge && (
+              <div>
+                <span className="text-text-muted">Spouse SS: </span>
+                <span className="text-text-primary tabular-nums">
+                  ${Math.round(getAdjustedSSBenefit(state.socialSecurity.spouse.monthlyBenefit, whatIf.spouseSSStartAge)).toLocaleString()}/mo
+                </span>
+              </div>
+            )}
             <div>
               <span className="text-text-muted">Achievable FI: </span>
               <span className="text-text-primary tabular-nums">
