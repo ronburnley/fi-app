@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Asset, AccountType, AccountOwner } from '../../types';
 import { Input, CurrencyInput, Toggle, Select, Button } from '../ui';
 import { generateId } from '../../utils/migration';
@@ -32,19 +32,22 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
   const [separatedFromService, setSeparatedFromService] = useState(asset?.separatedFromService ?? false);
 
   // Reset owner to 'self' if not married and owner was spouse
-  useEffect(() => {
+  const [prevIsMarried, setPrevIsMarried] = useState(isMarried);
+  if (isMarried !== prevIsMarried) {
+    setPrevIsMarried(isMarried);
     if (!isMarried && owner === 'spouse') {
       setOwner('self');
     }
-  }, [isMarried, owner]);
+  }
 
-  // Reset 401k fields when type changes
-  useEffect(() => {
-    if (type !== 'traditional' && type !== 'roth') {
+  // Handle type change: reset 401k fields when type is not retirement
+  const handleTypeChange = (newType: AccountType) => {
+    setType(newType);
+    if (newType !== 'traditional' && newType !== 'roth') {
       setIs401k(false);
       setSeparatedFromService(false);
     }
-  }, [type]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +117,7 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
             label="Account Type"
             options={ACCOUNT_TYPE_OPTIONS}
             value={type}
-            onChange={(value) => setType(value as AccountType)}
+            onChange={(value) => handleTypeChange(value as AccountType)}
           />
 
           {/* Owner segmented control - only show when married */}

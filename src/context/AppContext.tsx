@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
 import type { AppState, AppAction, WhatIfAdjustments, SyncStatus, Asset, AccountType } from '../types';
 import { DEFAULT_STATE, DEFAULT_WHAT_IF, DEFAULT_INCOME, STORAGE_KEY } from '../constants/defaults';

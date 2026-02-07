@@ -22,6 +22,44 @@ interface ChartDataPoint {
   total: number;
 }
 
+function CustomTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: number;
+}) {
+  if (!active || !payload) return null;
+
+  const total = payload.reduce((sum, entry) => sum + entry.value, 0);
+
+  return (
+    <div className="bg-bg-secondary border border-border-default rounded-lg p-3 shadow-lg">
+      <p className="text-sm font-medium text-text-primary mb-2">Age {label}</p>
+      <div className="space-y-1">
+        {payload.map((entry) => (
+          <div key={entry.name} className="flex items-center justify-between gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-text-secondary capitalize">{entry.name}</span>
+            </div>
+            <span className="text-text-primary tabular-nums">
+              {formatCurrency(entry.value)}
+            </span>
+          </div>
+        ))}
+        <div className="flex items-center justify-between gap-4 text-xs pt-1 border-t border-border-subtle">
+          <span className="text-text-secondary font-medium">Total</span>
+          <span className="text-text-primary font-medium tabular-nums">
+            {formatCurrency(total)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ChartView() {
   const { state, whatIf } = useApp();
   const { projections, summary } = useProjection();
@@ -44,44 +82,6 @@ export function ChartView() {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value}`;
-  };
-
-  const CustomTooltip = ({ active, payload, label }: {
-    active?: boolean;
-    payload?: Array<{ name: string; value: number; color: string }>;
-    label?: number;
-  }) => {
-    if (!active || !payload) return null;
-
-    const total = payload.reduce((sum, entry) => sum + entry.value, 0);
-
-    return (
-      <div className="bg-bg-secondary border border-border-default rounded-lg p-3 shadow-lg">
-        <p className="text-sm font-medium text-text-primary mb-2">Age {label}</p>
-        <div className="space-y-1">
-          {payload.map((entry) => (
-            <div key={entry.name} className="flex items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: entry.color }}
-                />
-                <span className="text-text-secondary capitalize">{entry.name}</span>
-              </div>
-              <span className="text-text-primary tabular-nums">
-                {formatCurrency(entry.value)}
-              </span>
-            </div>
-          ))}
-          <div className="flex items-center justify-between gap-4 text-xs pt-1 border-t border-border-subtle">
-            <span className="text-text-secondary font-medium">Total</span>
-            <span className="text-text-primary font-medium tabular-nums">
-              {formatCurrency(total)}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (

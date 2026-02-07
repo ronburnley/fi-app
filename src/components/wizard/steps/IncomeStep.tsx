@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { RetirementIncomeEditForm } from '../../inputs/RetirementIncomeEditForm';
 import { CurrencyInput, PercentInput, Toggle, Input, Select } from '../../ui';
-import type { EmploymentIncome, RetirementIncome, ContributionAccountType, AccountOwner, Income } from '../../../types';
+import type { Asset, EmploymentIncome, RetirementIncome, ContributionAccountType, AccountOwner, Income } from '../../../types';
 
 function formatCurrencyCompact(n: number): string {
   return n.toLocaleString('en-US', {
@@ -14,21 +14,34 @@ function formatCurrencyCompact(n: number): string {
   });
 }
 
+function getRetirementAccountsForOwner(accounts: Asset[], owner: AccountOwner) {
+  return accounts.filter(
+    (a) => (a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa') &&
+      (a.owner === owner || a.owner === 'joint')
+  );
+}
+
+function buildContributionOptions(accounts: Asset[], ownerLabel: string) {
+  const options = accounts.map(a => ({
+    value: a.id,
+    label: a.name,
+  }));
+
+  return [
+    ...options,
+    { value: 'create-traditional', label: `Create ${ownerLabel} Traditional 401(k)` },
+    { value: 'create-roth', label: `Create ${ownerLabel} Roth 401(k)` },
+    { value: 'split', label: 'Split across all retirement accounts' },
+  ];
+}
+
 export function IncomeStep() {
   const { state, dispatch } = useApp();
   const { income, profile, assets } = state;
   const isMarried = profile.filingStatus === 'married';
 
-  // Get retirement accounts filtered by owner for contribution destination options
-  const getRetirementAccountsForOwner = (owner: AccountOwner) => {
-    return assets.accounts.filter(
-      (a) => (a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa') &&
-        (a.owner === owner || a.owner === 'joint')
-    );
-  };
-
-  const selfRetirementAccounts = useMemo(() => getRetirementAccountsForOwner('self'), [assets.accounts]);
-  const spouseRetirementAccounts = useMemo(() => getRetirementAccountsForOwner('spouse'), [assets.accounts]);
+  const selfRetirementAccounts = getRetirementAccountsForOwner(assets.accounts, 'self');
+  const spouseRetirementAccounts = getRetirementAccountsForOwner(assets.accounts, 'spouse');
 
   const [hasEmployment, setHasEmployment] = useState(!!income.employment);
   const [hasSpouseEmployment, setHasSpouseEmployment] = useState(!!income.spouseEmployment);
@@ -182,30 +195,8 @@ export function IncomeStep() {
     return 'create-traditional';
   };
 
-  // Build contribution destination options
-  const buildContributionOptions = (accounts: typeof selfRetirementAccounts, ownerLabel: string) => {
-    const options = accounts.map(a => ({
-      value: a.id,
-      label: a.name,
-    }));
-
-    return [
-      ...options,
-      { value: 'create-traditional', label: `Create ${ownerLabel} Traditional 401(k)` },
-      { value: 'create-roth', label: `Create ${ownerLabel} Roth 401(k)` },
-      { value: 'split', label: 'Split across all retirement accounts' },
-    ];
-  };
-
-  const selfContributionOptions = useMemo(
-    () => buildContributionOptions(selfRetirementAccounts, ''),
-    [selfRetirementAccounts]
-  );
-
-  const spouseContributionOptions = useMemo(
-    () => buildContributionOptions(spouseRetirementAccounts, "Spouse's"),
-    [spouseRetirementAccounts]
-  );
+  const selfContributionOptions = buildContributionOptions(selfRetirementAccounts, '');
+  const spouseContributionOptions = buildContributionOptions(spouseRetirementAccounts, "Spouse's");
 
   // Retirement income handlers
   const handleAddRetirementIncome = (ri: RetirementIncome) => {

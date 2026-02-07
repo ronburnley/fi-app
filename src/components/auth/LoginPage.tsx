@@ -11,7 +11,7 @@ export function LoginPage() {
     setError(null);
     try {
       await signInWithGoogle();
-    } catch (err) {
+    } catch (_) {
       setError('Failed to sign in. Please try again.');
       setIsLoading(false);
     }

@@ -1,4 +1,4 @@
-import { forwardRef, useState, useEffect } from 'react';
+import { forwardRef, useState } from 'react';
 
 interface CurrencyInputProps {
   label?: string;
@@ -25,32 +25,27 @@ const parseCurrency = (value: string): number => {
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   ({ label, value, onChange, error, hint, id, disabled }, ref) => {
-    const [displayValue, setDisplayValue] = useState(formatCurrency(value));
+    const [editingValue, setEditingValue] = useState('');
     const [isFocused, setIsFocused] = useState(false);
 
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
-    useEffect(() => {
-      if (!isFocused) {
-        setDisplayValue(formatCurrency(value));
-      }
-    }, [value, isFocused]);
+    const displayValue = isFocused ? editingValue : formatCurrency(value);
 
     const handleFocus = () => {
+      setEditingValue(value === 0 ? '' : value.toString());
       setIsFocused(true);
-      setDisplayValue(value === 0 ? '' : value.toString());
     };
 
     const handleBlur = () => {
       setIsFocused(false);
-      const parsed = parseCurrency(displayValue);
+      const parsed = parseCurrency(editingValue);
       onChange(parsed);
-      setDisplayValue(formatCurrency(parsed));
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
-      setDisplayValue(raw);
+      setEditingValue(raw);
       const parsed = parseCurrency(raw);
       onChange(parsed);
     };

@@ -1,4 +1,4 @@
-import { forwardRef, useState, useEffect } from 'react';
+import { forwardRef, useState } from 'react';
 
 interface PercentInputProps {
   label?: string;
@@ -14,33 +14,29 @@ interface PercentInputProps {
 
 export const PercentInput = forwardRef<HTMLInputElement, PercentInputProps>(
   ({ label, value, onChange, error, hint, id, disabled, min = 0, max = 100 }, ref) => {
-    const [displayValue, setDisplayValue] = useState((value * 100).toFixed(1));
+    const [editingValue, setEditingValue] = useState('');
     const [isFocused, setIsFocused] = useState(false);
 
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
-    useEffect(() => {
-      if (!isFocused) {
-        setDisplayValue((value * 100).toFixed(1));
-      }
-    }, [value, isFocused]);
+    const displayValue = isFocused ? editingValue : (value * 100).toFixed(1);
 
     const handleFocus = () => {
+      setEditingValue((value * 100).toFixed(1));
       setIsFocused(true);
     };
 
     const handleBlur = () => {
       setIsFocused(false);
-      let parsed = parseFloat(displayValue);
+      let parsed = parseFloat(editingValue);
       if (isNaN(parsed)) parsed = 0;
       parsed = Math.max(min, Math.min(max, parsed));
       onChange(parsed / 100);
-      setDisplayValue(parsed.toFixed(1));
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
-      setDisplayValue(raw);
+      setEditingValue(raw);
       const parsed = parseFloat(raw);
       if (!isNaN(parsed)) {
         const clamped = Math.max(min, Math.min(max, parsed));
