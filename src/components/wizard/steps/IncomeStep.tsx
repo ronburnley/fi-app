@@ -3,7 +3,7 @@ import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { RetirementIncomeEditForm } from '../../inputs/RetirementIncomeEditForm';
 import { CurrencyInput, PercentInput, Toggle, Input, Select } from '../../ui';
-import type { EmploymentIncome, RetirementIncome, ContributionAccountType, AccountOwner } from '../../../types';
+import type { EmploymentIncome, RetirementIncome, ContributionAccountType, AccountOwner, Income } from '../../../types';
 
 function formatCurrencyCompact(n: number): string {
   return n.toLocaleString('en-US', {
@@ -46,6 +46,11 @@ export function IncomeStep() {
     return undefined;
   };
 
+  // Spouse additional work years
+  const [spouseAdditionalYears, setSpouseAdditionalYears] = useState<number>(
+    income.spouseAdditionalWorkYears ?? 0
+  );
+
   // Local state for employment fields
   const [selfEmployment, setSelfEmployment] = useState<EmploymentIncome>(() => {
     const existing = income.employment;
@@ -53,7 +58,6 @@ export function IncomeStep() {
     return {
       annualGrossIncome: 150000,
       annualContributions: 23000,
-      endAge: 55,
       effectiveTaxRate: 0.28,
       contributionAccountId: findDefaultContributionAccount(selfRetirementAccounts),
       contributionType: 'traditional',
@@ -66,7 +70,6 @@ export function IncomeStep() {
     return {
       annualGrossIncome: 100000,
       annualContributions: 15000,
-      endAge: 55,
       effectiveTaxRate: 0.25,
       contributionAccountId: findDefaultContributionAccount(spouseRetirementAccounts),
       contributionType: 'traditional',
@@ -234,8 +237,8 @@ export function IncomeStep() {
           Income
         </h1>
         <p className="text-text-secondary">
-          Model your employment income and other retirement income streams.
-          This step is optional.
+          Model current employment income and other income streams.
+          Employment stops at your calculated FI age. This step is optional.
         </p>
       </div>
 
@@ -281,25 +284,14 @@ export function IncomeStep() {
                     hint="Where contributions are deposited"
                   />
                 )}
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="Retirement Age"
-                    type="number"
-                    value={selfEmployment.endAge}
-                    onChange={(e) => updateSelfField('endAge', parseInt(e.target.value) || 55)}
-                    min={profile.currentAge}
-                    max={100}
-                    hint="When you'll stop working"
-                  />
-                  <PercentInput
-                    label="Effective Tax Rate"
-                    value={selfEmployment.effectiveTaxRate}
-                    onChange={(v) => updateSelfField('effectiveTaxRate', v)}
-                    hint="Combined fed + state"
-                    min={0}
-                    max={60}
-                  />
-                </div>
+                <PercentInput
+                  label="Effective Tax Rate"
+                  value={selfEmployment.effectiveTaxRate}
+                  onChange={(v) => updateSelfField('effectiveTaxRate', v)}
+                  hint="Combined fed + state"
+                  min={0}
+                  max={60}
+                />
               </div>
             )}
           </div>
@@ -338,25 +330,52 @@ export function IncomeStep() {
                       hint="Where contributions are deposited"
                     />
                   )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <Input
-                      label="Spouse Retirement Age"
-                      type="number"
-                      value={spouseEmployment.endAge}
-                      onChange={(e) => updateSpouseField('endAge', parseInt(e.target.value) || 55)}
-                      min={profile.spouseAge ?? 30}
-                      max={100}
-                      hint="When spouse stops working"
-                    />
-                    <PercentInput
-                      label="Spouse Tax Rate"
-                      value={spouseEmployment.effectiveTaxRate}
-                      onChange={(v) => updateSpouseField('effectiveTaxRate', v)}
-                      hint="Combined fed + state"
-                      min={0}
-                      max={60}
-                    />
-                  </div>
+                  <PercentInput
+                    label="Spouse Tax Rate"
+                    value={spouseEmployment.effectiveTaxRate}
+                    onChange={(v) => updateSpouseField('effectiveTaxRate', v)}
+                    hint="Combined fed + state"
+                    min={0}
+                    max={60}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Spouse works longer option — shown when both have employment */}
+          {hasEmployment && hasSpouseEmployment && isMarried && (
+            <div className="pt-4 border-t border-border-subtle/50">
+              <Toggle
+                label="Spouse works longer after I stop"
+                checked={spouseAdditionalYears > 0}
+                onChange={(enabled) => {
+                  const years = enabled ? 3 : 0;
+                  setSpouseAdditionalYears(years);
+                  dispatch({
+                    type: 'UPDATE_INCOME',
+                    payload: { spouseAdditionalWorkYears: years || undefined } as Partial<Income>,
+                  });
+                }}
+              />
+              {spouseAdditionalYears > 0 && (
+                <div className="mt-3">
+                  <Input
+                    label="Additional years"
+                    type="number"
+                    value={spouseAdditionalYears}
+                    onChange={(e) => {
+                      const years = Math.max(0, Math.min(20, parseInt(e.target.value) || 0));
+                      setSpouseAdditionalYears(years);
+                      dispatch({
+                        type: 'UPDATE_INCOME',
+                        payload: { spouseAdditionalWorkYears: years || undefined } as Partial<Income>,
+                      });
+                    }}
+                    min={1}
+                    max={20}
+                    hint="Years spouse keeps working after your FI age"
+                  />
                 </div>
               )}
             </div>

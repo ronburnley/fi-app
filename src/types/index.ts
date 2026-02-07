@@ -146,7 +146,6 @@ export type ContributionAccountType = 'traditional' | 'roth' | 'hsa' | 'mixed';
 export interface EmploymentIncome {
   annualGrossIncome: number;      // Pre-tax salary
   annualContributions: number;    // Total 401k/IRA/HSA contributions
-  endAge: number;                 // Age when employment ends (retirement age)
   effectiveTaxRate: number;       // Combined fed+state (decimal, e.g., 0.25)
   contributionAccountId?: string;    // Link to specific account for contributions
   contributionType?: ContributionAccountType;  // Type for auto-creation (default: 'traditional')
@@ -164,12 +163,13 @@ export interface RetirementIncome {
 }
 
 // Financial phase indicator for each projection year
-export type FinancialPhase = 'working' | 'gap' | 'fi';
+export type FinancialPhase = 'accumulating' | 'fi';
 
 // Combined income section
 export interface Income {
   employment?: EmploymentIncome;
   spouseEmployment?: EmploymentIncome;
+  spouseAdditionalWorkYears?: number;  // How many years spouse keeps working after primary stops
   retirementIncomes: RetirementIncome[];
 }
 
@@ -199,7 +199,7 @@ export interface AppState {
 export interface YearProjection {
   year: number;
   age: number;
-  phase: FinancialPhase;          // 'working' | 'gap' | 'fi'
+  phase: FinancialPhase;          // 'accumulating' | 'fi'
   expenses: number;
   income: number;                 // SS + pension + retirement income streams
   employmentIncome: number;       // Net after-tax employment income
@@ -243,12 +243,19 @@ export interface WizardState {
   maxVisitedStep: number;
 }
 
+export interface ShortfallGuidance {
+  runsOutAtAge: number;              // Age when money runs out
+  spendingReductionNeeded: number;   // Annual spending reduction to make FI work
+  additionalSavingsNeeded: number;   // Annual additional savings to make FI work
+}
+
 export interface AchievableFIResult {
   achievableFIAge: number | null;  // null if never achievable
   confidenceLevel: 'high' | 'moderate' | 'tight' | 'not_achievable';
   bufferYears: number;
   yearsUntilFI: number | null;
   fiAtCurrentAge: boolean;
+  shortfallGuidance?: ShortfallGuidance;  // Only present when not_achievable
 }
 
 export type AppAction =

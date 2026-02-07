@@ -678,6 +678,50 @@ When building this app:
 
 ## Changelog
 
+### v6.0 - 2026-02-07 - FI Age Model Rework (Remove Retirement Age)
+
+**Major Change:**
+Removed the separate "retirement age" concept. The app now calculates ONE number: the earliest age at which you can stop all employment and never run out of money. Employment income stops at the calculated FI age — there is no gap phase.
+
+**Data Model Changes:**
+- Removed `endAge` from `EmploymentIncome` interface
+- Changed `FinancialPhase` from `'working' | 'gap' | 'fi'` to `'accumulating' | 'fi'`
+- Added `spouseAdditionalWorkYears?: number` to `Income` interface
+- Added `ShortfallGuidance` interface with `runsOutAtAge`, `spendingReductionNeeded`, `additionalSavingsNeeded`
+- Added optional `shortfallGuidance` field to `AchievableFIResult`
+
+**Calculation Changes:**
+- `determinePhase()` simplified to two phases: accumulating (before FI age) and fi (at/after FI age)
+- `calculateEmploymentIncome()` uses FI age as employment stop point instead of separate `endAge`
+- Spouse can work past primary's FI age via `spouseAdditionalWorkYears`
+- Binary search now tests different accumulation lengths (each candidate FI age = different working years)
+- `calculateShortfallGuidance()` computes actionable numbers when FI is not achievable
+- Merged working/gap phase logic — employment income presence drives accumulation behavior
+
+**UI Changes:**
+- Removed "Retirement Age" and "Spouse Retirement Age" inputs from Income wizard step
+- Added "Spouse works longer after I stop" toggle with years input
+- Updated step description: "Employment stops at your calculated FI age"
+- Removed "Years to Retirement" card from SummaryMetrics (always 4-column grid)
+- Shortfall guidance shown when FI not achievable (runs out age, spending reduction, savings needed)
+- Removed "Retire" and "Spouse" amber reference lines from chart
+- Table phase badges: WORK/GAP/FI → ACCUM/FI
+
+**Migration:**
+- `needsEndAgeMigration()` detects legacy `endAge` on employment data
+- `migrateEndAge()` strips `endAge` and converts spouse endAge delta to `spouseAdditionalWorkYears`
+
+**Files Modified:**
+- `src/types/index.ts` - Data model changes
+- `src/utils/calculations.ts` - Phase/employment/shortfall guidance rework
+- `src/utils/migration.ts` - endAge migration functions
+- `src/context/AppContext.tsx` - Migration call + mergeWithDefaults update
+- `src/components/wizard/steps/IncomeStep.tsx` - Removed retirement age, added spouse delay
+- `src/components/results/SummaryMetrics.tsx` - Removed retirement card, added guidance
+- `src/components/results/ChartView.tsx` - Removed retire reference lines
+- `src/components/results/TableView.tsx` - Updated phase config
+- `src/utils/calculations.test.ts` - Updated fixtures, 46 tests (was 43)
+
 ### v5.5 - 2026-02-07 - Assumptions Page Rework
 
 **UI Changes:**

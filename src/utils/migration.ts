@@ -231,6 +231,52 @@ export function migrateHomeExpense(home: HomeExpense & { mortgage?: LegacyMortga
   };
 }
 
+// Legacy employment format (had endAge)
+interface LegacyEmploymentIncome extends EmploymentIncome {
+  endAge?: number;
+}
+
+// Check if employment income has legacy endAge field that needs stripping
+export function needsEndAgeMigration(income: Income | undefined): boolean {
+  if (!income) return false;
+  const self = income.employment as LegacyEmploymentIncome | undefined;
+  const spouse = income.spouseEmployment as LegacyEmploymentIncome | undefined;
+  return (self !== undefined && 'endAge' in self) || (spouse !== undefined && 'endAge' in spouse);
+}
+
+// Strip endAge from employment and convert spouse delta to spouseAdditionalWorkYears
+export function migrateEndAge(income: Income): Income {
+  const selfLegacy = income.employment as LegacyEmploymentIncome | undefined;
+  const spouseLegacy = income.spouseEmployment as LegacyEmploymentIncome | undefined;
+
+  // Calculate spouseAdditionalWorkYears from endAge delta if both exist
+  let spouseAdditionalWorkYears = income.spouseAdditionalWorkYears;
+  if (selfLegacy?.endAge !== undefined && spouseLegacy?.endAge !== undefined) {
+    const delta = spouseLegacy.endAge - selfLegacy.endAge;
+    spouseAdditionalWorkYears = Math.max(0, delta);
+  }
+
+  // Strip endAge from both
+  let updatedEmployment = income.employment;
+  if (selfLegacy && 'endAge' in selfLegacy) {
+    const { endAge: _, ...rest } = selfLegacy;
+    updatedEmployment = rest as EmploymentIncome;
+  }
+
+  let updatedSpouseEmployment = income.spouseEmployment;
+  if (spouseLegacy && 'endAge' in spouseLegacy) {
+    const { endAge: _, ...rest } = spouseLegacy;
+    updatedSpouseEmployment = rest as EmploymentIncome;
+  }
+
+  return {
+    ...income,
+    employment: updatedEmployment,
+    spouseEmployment: updatedSpouseEmployment,
+    spouseAdditionalWorkYears,
+  };
+}
+
 // Check if employment income needs contribution linking
 export function needsEmploymentContributionMigration(employment: EmploymentIncome | undefined): boolean {
   if (!employment) return false;

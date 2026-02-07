@@ -14,6 +14,8 @@ import {
   generateId,
   needsEmploymentContributionMigration,
   migrateEmploymentContributions,
+  needsEndAgeMigration,
+  migrateEndAge,
 } from '../utils/migration';
 import { calculateAchievableFIAge } from '../utils/calculations';
 import { useAuth } from './AuthContext';
@@ -393,6 +395,7 @@ function mergeWithDefaults(partial: Partial<AppState>): AppState {
         ...DEFAULT_INCOME,
         ...partial.income,
         retirementIncomes: partial.income.retirementIncomes || [],
+        spouseAdditionalWorkYears: partial.income.spouseAdditionalWorkYears ?? undefined,
       }
     : DEFAULT_INCOME;
 
@@ -440,6 +443,12 @@ function migrateData(data: AppState): AppState {
 
   // Migrate employment contribution linking
   let migratedIncome = data.income;
+
+  // Strip legacy endAge from employment and convert to spouseAdditionalWorkYears
+  if (migratedIncome && needsEndAgeMigration(migratedIncome)) {
+    migratedIncome = migrateEndAge(migratedIncome);
+  }
+
   if (
     migratedIncome &&
     (needsEmploymentContributionMigration(migratedIncome.employment) ||

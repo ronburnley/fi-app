@@ -12,35 +12,10 @@ export function SummaryMetrics() {
   const hasBuffer = achievableFI.bufferYears >= 0;
   const isAchievable = achievableFI.confidenceLevel !== 'not_achievable';
 
-  // Employment/retirement info
-  const hasEmployment = state.income.employment || state.income.spouseEmployment;
-  const selfRetirementAge = state.income.employment?.endAge;
-  const spouseRetirementAge = state.income.spouseEmployment?.endAge;
-  const earliestRetirementAge = Math.min(
-    selfRetirementAge ?? Infinity,
-    spouseRetirementAge ?? Infinity
-  );
-  const yearsToRetirement = hasEmployment && earliestRetirementAge !== Infinity
-    ? earliestRetirementAge - state.profile.currentAge
-    : null;
-
   return (
     <div className="space-y-4">
       {/* Main metrics grid */}
-      <div className={`grid grid-cols-2 gap-3 ${hasEmployment ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
-        {/* Years to Retirement (only if employment income configured) */}
-        {hasEmployment && yearsToRetirement !== null && (
-          <div className="bg-bg-secondary border border-amber-500/30 rounded-lg p-4">
-            <p className="text-xs text-text-muted mb-1">Years to Retirement</p>
-            <p className="text-xl font-semibold text-amber-400 tabular-nums">
-              {yearsToRetirement > 0 ? `${yearsToRetirement} years` : 'Now'}
-            </p>
-            <p className="text-xs text-text-muted mt-1">
-              Retire at age {earliestRetirementAge}
-            </p>
-          </div>
-        )}
-
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {/* Achievable FI Age - Featured */}
         <div className={`bg-bg-secondary border rounded-lg p-4 ${
           isAchievable ? 'border-accent-primary/30' : 'border-accent-warning/30'
@@ -58,7 +33,9 @@ export function SummaryMetrics() {
               ? 'Already FI!'
               : achievableFI.yearsUntilFI !== null
                 ? `${achievableFI.yearsUntilFI} years from now`
-                : 'Review inputs'}
+                : achievableFI.shortfallGuidance
+                  ? `Money runs out at age ${achievableFI.shortfallGuidance.runsOutAtAge}`
+                  : 'Review inputs'}
           </p>
         </div>
 
@@ -144,7 +121,17 @@ export function SummaryMetrics() {
               ? `Your current assets can sustain your spending through age ${state.profile.lifeExpectancy} with ${achievableFI.bufferYears} years of buffer.`
               : isAchievable
                 ? `You can achieve FI at age ${achievableFI.achievableFIAge} (in ${achievableFI.yearsUntilFI} years). Your money should last ${achievableFI.bufferYears >= 0 ? `${achievableFI.bufferYears} years past` : `until ${achievableFI.bufferYears} years before`} your life expectancy.`
-                : 'Try reducing spending, increasing assets, or adjusting other assumptions to find an achievable path.'}
+                : achievableFI.shortfallGuidance
+                  ? `Money runs out at age ${achievableFI.shortfallGuidance.runsOutAtAge}.${
+                      achievableFI.shortfallGuidance.spendingReductionNeeded > 0
+                        ? ` Reduce spending by ${formatCurrency(achievableFI.shortfallGuidance.spendingReductionNeeded, true)}/yr`
+                        : ''
+                    }${
+                      achievableFI.shortfallGuidance.additionalSavingsNeeded > 0
+                        ? ` or save ${formatCurrency(achievableFI.shortfallGuidance.additionalSavingsNeeded, true)}/yr more.`
+                        : '.'
+                    }`
+                  : 'Try reducing spending, increasing assets, or adjusting assumptions.'}
           </p>
         </div>
       </div>

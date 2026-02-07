@@ -9,6 +9,7 @@ import type {
   PenaltySettings,
   StateTaxInfo,
   AchievableFIResult,
+  ShortfallGuidance,
   Expenses,
   MortgageDetails,
   FinancialPhase,
@@ -604,32 +605,20 @@ function growAssetBalances(
 
 /**
  * Determine the financial phase for a given year
- * - 'working': Still employed (age < employment end age)
- * - 'gap': Retired from work but before FI (bridging period)
- * - 'fi': At or past FI age
+ * - 'accumulating': Before FI age (may have employment income)
+ * - 'fi': At or past FI age (no employment, drawdown phase)
+ *
+ * Employment stops at FI age for primary. Spouse may work longer
+ * by spouseAdditionalWorkYears.
  */
 function determinePhase(
   selfAge: number,
-  spouseAge: number | undefined,
-  selfEmployment: EmploymentIncome | undefined,
-  spouseEmployment: EmploymentIncome | undefined,
   fiAge: number
 ): FinancialPhase {
-  // Check if either person is still working
-  const selfWorking = selfEmployment && selfAge < selfEmployment.endAge;
-  const spouseWorking = spouseEmployment && spouseAge !== undefined && spouseAge < spouseEmployment.endAge;
-
-  if (selfWorking || spouseWorking) {
-    return 'working';
-  }
-
-  // Not working - check if at FI age
   if (selfAge >= fiAge) {
     return 'fi';
   }
-
-  // In the gap between retirement and FI
-  return 'gap';
+  return 'accumulating';
 }
 
 interface EmploymentIncomeResult {
@@ -644,28 +633,34 @@ interface EmploymentIncomeResult {
 /**
  * Calculate total employment income for a given year
  * Returns gross, net (after tax and contributions), tax, and contribution amounts
+ *
+ * Primary employment stops at fiAge. Spouse employment stops at
+ * fiAge + spouseAdditionalWorkYears (on primary's age calendar).
  */
 function calculateEmploymentIncome(
   selfAge: number,
   spouseAge: number | undefined,
   selfEmployment: EmploymentIncome | undefined,
   spouseEmployment: EmploymentIncome | undefined,
-  filingStatus: 'single' | 'married'
+  filingStatus: 'single' | 'married',
+  fiAge: number,
+  spouseAdditionalWorkYears: number = 0
 ): EmploymentIncomeResult {
   let grossIncome = 0;
   let selfContributions = 0;
   let spouseContributions = 0;
   let tax = 0;
 
-  // Self employment income
-  if (selfEmployment && selfAge < selfEmployment.endAge) {
+  // Self employment income: stops at FI age
+  if (selfEmployment && selfAge < fiAge) {
     grossIncome += selfEmployment.annualGrossIncome;
     selfContributions = selfEmployment.annualContributions;
     tax += selfEmployment.annualGrossIncome * selfEmployment.effectiveTaxRate;
   }
 
-  // Spouse employment income
-  if (filingStatus === 'married' && spouseEmployment && spouseAge !== undefined && spouseAge < spouseEmployment.endAge) {
+  // Spouse employment income: stops at fiAge + spouseAdditionalWorkYears (on primary's calendar)
+  const spouseStopAge = fiAge + spouseAdditionalWorkYears;
+  if (filingStatus === 'married' && spouseEmployment && spouseAge !== undefined && selfAge < spouseStopAge) {
     grossIncome += spouseEmployment.annualGrossIncome;
     spouseContributions = spouseEmployment.annualContributions;
     tax += spouseEmployment.annualGrossIncome * spouseEmployment.effectiveTaxRate;
@@ -1040,21 +1035,18 @@ export function calculateProjection(
       : undefined;
 
     // Determine financial phase
-    const phase = determinePhase(
-      age,
-      spouseAge,
-      income.employment,
-      income.spouseEmployment,
-      effectiveFIAge
-    );
+    const phase = determinePhase(age, effectiveFIAge);
 
-    // Calculate employment income (only during working phase)
+    // Calculate employment income (stops at FI age for primary, may continue for spouse)
+    const spouseAdditionalWorkYears = income.spouseAdditionalWorkYears ?? 0;
     const employmentResult = calculateEmploymentIncome(
       age,
       spouseAge,
       income.employment,
       income.spouseEmployment,
-      profile.filingStatus
+      profile.filingStatus,
+      effectiveFIAge,
+      spouseAdditionalWorkYears
     );
 
     // Calculate expenses - always needed (even during working years for tracking)
@@ -1132,11 +1124,12 @@ export function calculateProjection(
     let totalIncome = 0;
     let gap = 0;
 
-    if (phase === 'working') {
-      // WORKING PHASE: Employment income covers expenses, contributions grow accounts
-      yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal);
-      // totalIncome = passive income only (for consistency with FI phase)
-      // Employment income is tracked separately in employmentResult.netIncome
+    // Check if there's any employment income this year (can span into FI phase for spouse)
+    const hasEmploymentThisYear = employmentResult.grossIncome > 0;
+
+    if (hasEmploymentThisYear) {
+      // ACCUMULATING/TRANSITIONAL: Employment income present, covers expenses, contributions grow accounts
+      yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
       totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
 
       // Add contributions to retirement accounts BEFORE calculating surplus
@@ -1173,7 +1166,7 @@ export function calculateProjection(
         );
         withdrawalSource = 'Savings';
       } else if (surplus < 0) {
-        // Negative surplus: need to withdraw from accounts (rare during working years)
+        // Negative surplus: need to withdraw from accounts
         gap = Math.abs(surplus);
         const result = withdrawFromAccounts(
           gap,
@@ -1195,8 +1188,15 @@ export function calculateProjection(
         balances = result.balances;
         assetBalanceMap = result.assetBalances;
       }
+
+      // Update withdrawal source if mortgage payoff occurred
+      if (mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A' && withdrawalSource !== 'Savings') {
+        withdrawalSource = `${withdrawalSource} (+ Mortgage Payoff)`;
+      } else if (mortgagePayoffExpense > 0 && withdrawalSource === 'N/A') {
+        withdrawalSource = 'Mortgage Payoff';
+      }
     } else {
-      // GAP or FI PHASE: No employment income, rely on passive income and withdrawals
+      // FI PHASE (no employment): Rely on passive income and withdrawals
       yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
       totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
 
@@ -1363,6 +1363,78 @@ function testFIAge(
 }
 
 /**
+ * Calculate shortfall guidance when FI is not achievable.
+ * Provides actionable numbers: when money runs out, how much to cut spending,
+ * how much more to save.
+ */
+function calculateShortfallGuidance(
+  state: AppState,
+  whatIf?: WhatIfAdjustments
+): ShortfallGuidance {
+  const { lifeExpectancy } = state.profile;
+
+  // Find when money runs out (test at latest possible FI = life expectancy - 1)
+  const testState: AppState = {
+    ...state,
+    profile: {
+      ...state.profile,
+      targetFIAge: lifeExpectancy - 1,
+    },
+  };
+  const projections = calculateProjection(testState, whatIf);
+  const shortfallYear = projections.find((p) => p.isShortfall);
+  const runsOutAtAge = shortfallYear ? shortfallYear.age : lifeExpectancy;
+
+  // Binary search for spending reduction that makes FI achievable at lifeExpectancy - 1
+  let spendingReductionNeeded = 0;
+  const currentSpendingMultiplier = 1 + (whatIf?.spendingAdjustment || 0);
+
+  // Try spending reductions from 5% to 80% in 5% increments
+  for (let reduction = 0.05; reduction <= 0.80; reduction += 0.05) {
+    const adjustedWhatIf: WhatIfAdjustments = {
+      ...whatIf,
+      spendingAdjustment: (currentSpendingMultiplier * (1 - reduction)) - 1,
+      returnAdjustment: whatIf?.returnAdjustment ?? state.assumptions.investmentReturn,
+      ssStartAge: whatIf?.ssStartAge ?? state.socialSecurity.startAge,
+    };
+    if (testFIAge(state, lifeExpectancy - 1, adjustedWhatIf)) {
+      // Calculate annual dollar amount of reduction needed
+      const currentYear = new Date().getFullYear();
+      let baseSpending = 0;
+      for (const expense of state.expenses.categories) {
+        const startYear = expense.startYear ?? currentYear;
+        const endYear = expense.endYear ?? Infinity;
+        if (currentYear >= startYear && currentYear <= endYear) {
+          baseSpending += expense.annualAmount;
+        }
+      }
+      if (state.expenses.home) {
+        if (state.expenses.home.mortgage) {
+          baseSpending += state.expenses.home.mortgage.monthlyPayment * 12;
+        }
+        baseSpending += state.expenses.home.propertyTax + state.expenses.home.insurance;
+      }
+      spendingReductionNeeded = Math.round(baseSpending * currentSpendingMultiplier * reduction);
+      break;
+    }
+  }
+
+  // Estimate additional savings needed (annual) using simple approach:
+  // years until life expectancy * additional savings = roughly the shortfall
+  const yearsToLE = lifeExpectancy - state.profile.currentAge;
+  const shortfallAmount = projections
+    .filter((p) => p.isShortfall)
+    .reduce((sum, p) => sum + Math.max(0, p.gap - p.withdrawal), 0);
+  const additionalSavingsNeeded = yearsToLE > 0 ? Math.round(shortfallAmount / yearsToLE) : 0;
+
+  return {
+    runsOutAtAge,
+    spendingReductionNeeded,
+    additionalSavingsNeeded,
+  };
+}
+
+/**
  * Calculate the earliest achievable FI age using binary search
  */
 export function calculateAchievableFIAge(
@@ -1407,12 +1479,16 @@ export function calculateAchievableFIAge(
 
   // Test if FI is ever achievable (test at life expectancy - 1)
   if (!testFIAge(state, lifeExpectancy - 1, whatIf)) {
+    // Calculate shortfall guidance
+    const shortfallGuidance = calculateShortfallGuidance(state, whatIf);
+
     return {
       achievableFIAge: null,
       confidenceLevel: 'not_achievable',
       bufferYears: 0,
       yearsUntilFI: null,
       fiAtCurrentAge: false,
+      shortfallGuidance,
     };
   }
 

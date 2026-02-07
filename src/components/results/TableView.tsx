@@ -6,8 +6,7 @@ import type { FinancialPhase } from '../../types';
 
 // Phase badge colors and labels
 const PHASE_CONFIG: Record<FinancialPhase, { label: string; color: string; bg: string }> = {
-  working: { label: 'WORK', color: 'text-blue-400', bg: 'bg-blue-400/10' },
-  gap: { label: 'GAP', color: 'text-amber-400', bg: 'bg-amber-400/10' },
+  accumulating: { label: 'ACCUM', color: 'text-blue-400', bg: 'bg-blue-400/10' },
   fi: { label: 'FI', color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
 };
 
@@ -196,7 +195,7 @@ export function TableView() {
                     </span>
                   </td>
                   <td className="px-4 py-2 text-left text-text-muted text-xs whitespace-nowrap">
-                    {projection.withdrawal > 0 ? projection.withdrawalSource : (projection.phase === 'working' && projection.contributions > 0 ? 'Contributing' : '-')}
+                    {projection.withdrawal > 0 ? projection.withdrawalSource : (projection.phase === 'accumulating' && projection.contributions > 0 ? 'Contributing' : '-')}
                   </td>
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {formatCurrency(projection.taxableBalance)}

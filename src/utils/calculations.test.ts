@@ -201,7 +201,6 @@ describe('Employment Income Calculations', () => {
         employment: {
           annualGrossIncome: 150000,
           annualContributions: 23000,
-          endAge: 55,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -215,7 +214,7 @@ describe('Employment Income Calculations', () => {
     // Net = 150000 - 37500 - 23000 = 89500
     expect(year1.employmentIncome).toBe(89500);
     expect(year1.contributions).toBe(23000);
-    expect(year1.phase).toBe('working');
+    expect(year1.phase).toBe('accumulating');
   });
 
   it('calculates correct net income for married couple', () => {
@@ -224,13 +223,11 @@ describe('Employment Income Calculations', () => {
         employment: {
           annualGrossIncome: 150000,
           annualContributions: 23000,
-          endAge: 55,
           effectiveTaxRate: 0.25,
         },
         spouseEmployment: {
           annualGrossIncome: 100000,
           annualContributions: 15000,
-          endAge: 55,
           effectiveTaxRate: 0.22,
         },
         retirementIncomes: [],
@@ -247,14 +244,13 @@ describe('Employment Income Calculations', () => {
     expect(year1.contributions).toBe(38000);
   });
 
-  it('stops employment income at retirement age', () => {
+  it('stops employment income at FI age', () => {
     const state = createTestState({
-      profile: { currentAge: 54, targetFIAge: 60, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
       income: {
         employment: {
           annualGrossIncome: 150000,
           annualContributions: 23000,
-          endAge: 55,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -263,27 +259,67 @@ describe('Employment Income Calculations', () => {
 
     const projections = calculateProjection(state);
 
-    // Age 54: Still working
+    // Age 50-54: Still accumulating, employment active
     expect(projections[0].employmentIncome).toBe(89500);
-    expect(projections[0].phase).toBe('working');
+    expect(projections[0].phase).toBe('accumulating');
+    expect(projections[4].employmentIncome).toBe(89500);
 
-    // Age 55: Retired (endAge is exclusive)
-    expect(projections[1].employmentIncome).toBe(0);
-    expect(projections[1].phase).toBe('gap');
+    // Age 55: FI — no employment
+    expect(projections[5].employmentIncome).toBe(0);
+    expect(projections[5].phase).toBe('fi');
+  });
+
+  it('supports spouse additional work years', () => {
+    const state = createTestState({
+      profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 70, state: 'TX', filingStatus: 'married', spouseAge: 43 },
+      income: {
+        employment: {
+          annualGrossIncome: 150000,
+          annualContributions: 0,
+          effectiveTaxRate: 0.25,
+        },
+        spouseEmployment: {
+          annualGrossIncome: 100000,
+          annualContributions: 0,
+          effectiveTaxRate: 0.22,
+        },
+        spouseAdditionalWorkYears: 3,
+        retirementIncomes: [],
+      },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 80000, inflationRate: 0, category: 'living' }],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Age 49 (before FI): Both working
+    expect(projections[4].employmentIncome).toBeGreaterThan(0);
+
+    // Age 50 (FI): Primary stops, spouse still works (FI + 0 < 50 + 3 = 53)
+    // Self employment = 0, spouse still contributes
+    const fiYearProjection = projections[5]; // age 50
+    // Spouse should still have income at age 50 (primary's FI age)
+    // because spouseAdditionalWorkYears = 3, so spouse works until primary age 53
+    expect(fiYearProjection.employmentIncome).toBeGreaterThan(0);
+
+    // Age 53 (FI + 3): Spouse also stops
+    const spouseStopProjection = projections[8]; // age 53
+    expect(spouseStopProjection.employmentIncome).toBe(0);
   });
 });
 
 // ==================== Phase Determination ====================
 
 describe('Phase Determination', () => {
-  it('correctly identifies working phase', () => {
+  it('correctly identifies accumulating phase before FI age', () => {
     const state = createTestState({
       profile: { currentAge: 45, targetFIAge: 60, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
       income: {
         employment: {
           annualGrossIncome: 100000,
           annualContributions: 0,
-          endAge: 55,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -292,42 +328,19 @@ describe('Phase Determination', () => {
 
     const projections = calculateProjection(state);
 
-    // Ages 45-54: Working
-    for (let i = 0; i <= 9; i++) {
-      expect(projections[i].phase).toBe('working');
+    // Ages 45-59: Accumulating (before FI age)
+    for (let i = 0; i <= 14; i++) {
+      expect(projections[i].phase).toBe('accumulating');
     }
   });
 
-  it('correctly identifies gap phase', () => {
+  it('correctly identifies FI phase at and after FI age', () => {
     const state = createTestState({
       profile: { currentAge: 45, targetFIAge: 60, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
       income: {
         employment: {
           annualGrossIncome: 100000,
           annualContributions: 0,
-          endAge: 55,
-          effectiveTaxRate: 0.25,
-        },
-        retirementIncomes: [],
-      },
-    });
-
-    const projections = calculateProjection(state);
-
-    // Ages 55-59: Gap (retired but before FI)
-    for (let i = 10; i <= 14; i++) {
-      expect(projections[i].phase).toBe('gap');
-    }
-  });
-
-  it('correctly identifies FI phase', () => {
-    const state = createTestState({
-      profile: { currentAge: 45, targetFIAge: 60, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
-      income: {
-        employment: {
-          annualGrossIncome: 100000,
-          annualContributions: 0,
-          endAge: 55,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -340,6 +353,27 @@ describe('Phase Determination', () => {
     for (let i = 15; i < projections.length; i++) {
       expect(projections[i].phase).toBe('fi');
     }
+  });
+
+  it('has no gap phase — only accumulating and fi', () => {
+    const state = createTestState({
+      profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          annualContributions: 0,
+          effectiveTaxRate: 0.25,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const phases = new Set(projections.map((p) => p.phase));
+
+    expect(phases.has('accumulating')).toBe(true);
+    expect(phases.has('fi')).toBe(true);
+    expect(phases.size).toBe(2);
   });
 });
 
@@ -660,7 +694,6 @@ describe('Contribution Distribution', () => {
         employment: {
           annualGrossIncome: 150000,
           annualContributions: 23000,
-          endAge: 55,
           effectiveTaxRate: 0.25,
           contributionAccountId: 'trad-1', // Linked to traditional
         },
@@ -702,7 +735,6 @@ describe('Contribution Distribution', () => {
         employment: {
           annualGrossIncome: 150000,
           annualContributions: 20000,
-          endAge: 55,
           effectiveTaxRate: 0.25,
           contributionType: 'mixed',
         },
@@ -746,7 +778,6 @@ describe('Surplus Handling', () => {
         employment: {
           annualGrossIncome: 150000,
           annualContributions: 0,
-          endAge: 50,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -829,6 +860,74 @@ describe('Achievable FI Age', () => {
 
     expect(result.confidenceLevel).toBe('not_achievable');
     expect(result.achievableFIAge).toBeNull();
+  });
+
+  it('provides shortfall guidance when not achievable', () => {
+    const state = createTestState({
+      profile: { currentAge: 80, targetFIAge: 80, lifeExpectancy: 95, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'cash-1', name: 'Cash', type: 'cash', owner: 'self', balance: 10000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 100000, inflationRate: 0.03, category: 'living' }],
+      },
+    });
+
+    const result = calculateAchievableFIAge(state);
+
+    expect(result.confidenceLevel).toBe('not_achievable');
+    expect(result.shortfallGuidance).toBeDefined();
+    expect(result.shortfallGuidance!.runsOutAtAge).toBeGreaterThanOrEqual(80);
+    expect(result.shortfallGuidance!.runsOutAtAge).toBeLessThan(95);
+  });
+
+  it('employment income makes FI achievable earlier', () => {
+    // Without employment: need FI later
+    const stateNoEmployment = createTestState({
+      profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 95, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 500000, costBasis: 300000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0.03, category: 'living' }],
+      },
+    });
+
+    // With employment: accumulates wealth, FI earlier
+    const stateWithEmployment = createTestState({
+      profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 95, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 500000, costBasis: 300000 },
+        ],
+      },
+      income: {
+        employment: {
+          annualGrossIncome: 200000,
+          annualContributions: 0,
+          effectiveTaxRate: 0.25,
+        },
+        retirementIncomes: [],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0.03, category: 'living' }],
+      },
+    });
+
+    const noEmploymentResult = calculateAchievableFIAge(stateNoEmployment);
+    const withEmploymentResult = calculateAchievableFIAge(stateWithEmployment);
+
+    // With employment, FI should be achievable at an earlier age
+    if (noEmploymentResult.achievableFIAge !== null && withEmploymentResult.achievableFIAge !== null) {
+      expect(withEmploymentResult.achievableFIAge).toBeLessThanOrEqual(noEmploymentResult.achievableFIAge);
+    }
   });
 });
 
