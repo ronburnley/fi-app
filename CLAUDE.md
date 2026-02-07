@@ -30,8 +30,9 @@ There is no "gap" phase. FI age = when employment stops.
 | File | Purpose |
 |------|---------|
 | `src/types/index.ts` | All TypeScript interfaces (source of truth for data model) |
-| `src/utils/calculations.ts` | Projection engine, binary search, tax/penalty logic |
+| `src/utils/calculations/` | Projection engine split into 10 modules (types, mortgage, socialSecurity, withdrawals, balances, expenses, projection, summary, fiSearch, index) |
 | `src/utils/calculations.test.ts` | 46 unit tests (Vitest) |
+| `src/utils/calculations.integration.test.ts` | 16 integration tests (multi-system scenarios) |
 | `src/hooks/useProjection.ts` | Memoized projection hook |
 | `src/hooks/useAchievableFI.ts` | Binary search for earliest FI age |
 | `src/context/AppContext.tsx` | Global state, Supabase sync, migrations |
@@ -138,6 +139,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v6.1 | 2026-02-07 | **Engine Refactor** — Split 1545-line `calculations.ts` into 10 focused modules under `calculations/`. Added 16 integration tests (62 total). Zero logic changes. |
 | v6.0 | 2026-02-07 | **FI Age Model Rework** — Removed retirement age (`endAge`). FI age IS when employment stops. Two phases (accumulating/fi), no gap. Spouse additional work years. Shortfall guidance. |
 | v5.5 | 2026-02-07 | Assumptions page layout rework (narrower, 4 sections, clearer labels) |
 | v5.4 | 2026-02-06 | FRA-based Social Security auto-adjustment (62/67/70 claiming factors) |
