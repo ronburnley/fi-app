@@ -651,15 +651,18 @@ export function AppProvider({ children }: AppProviderProps) {
   // Sync targetFIAge with calculated achievable FI age
   useEffect(() => {
     const result = calculateAchievableFIAge(state, whatIf);
-    const newFIAge = result.achievableFIAge ?? lifeExpectancy - 1;
 
-    // Only update if the calculated age is different from last time
-    if (lastCalculatedFIAge.current !== newFIAge && targetFIAge !== newFIAge) {
-      lastCalculatedFIAge.current = newFIAge;
-      dispatch({
-        type: 'UPDATE_PROFILE',
-        payload: { targetFIAge: newFIAge },
-      });
+    // Only update targetFIAge when FI is achievable.
+    // When not achievable, keep the last valid targetFIAge (avoids forcing employment to run to lifeExpectancy - 1).
+    if (result.achievableFIAge !== null) {
+      const newFIAge = result.achievableFIAge;
+      if (lastCalculatedFIAge.current !== newFIAge && targetFIAge !== newFIAge) {
+        lastCalculatedFIAge.current = newFIAge;
+        dispatch({
+          type: 'UPDATE_PROFILE',
+          payload: { targetFIAge: newFIAge },
+        });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
