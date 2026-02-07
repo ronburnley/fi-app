@@ -26,43 +26,54 @@ export function AssumptionsSection() {
   };
 
   return (
-    <Card title="Assumptions">
+    <Card>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <PercentInput
-            label="Investment Return"
-            value={assumptions.investmentReturn}
-            onChange={(value) => updateAssumptions('investmentReturn', value)}
-            hint="Annual return (before inflation)"
-            min={-20}
-            max={20}
-          />
-          <PercentInput
-            label="Inflation Rate"
-            value={assumptions.inflationRate}
-            onChange={(value) => updateAssumptions('inflationRate', value)}
-            hint="Annual inflation"
-            min={0}
-            max={15}
-          />
+        <div>
+          <p className="text-xs text-text-muted mb-3">Growth & Inflation</p>
+          <div className="grid grid-cols-3 gap-3">
+            <PercentInput
+              label="Investment Return"
+              value={assumptions.investmentReturn}
+              onChange={(value) => updateAssumptions('investmentReturn', value)}
+              hint="Nominal annual return"
+              min={-20}
+              max={20}
+            />
+            <PercentInput
+              label="General Inflation"
+              value={assumptions.inflationRate}
+              onChange={(value) => updateAssumptions('inflationRate', value)}
+              hint="For retirement income & home cost default"
+              min={0}
+              max={15}
+            />
+            <PercentInput
+              label="Withdrawal Rate"
+              value={assumptions.safeWithdrawalRate}
+              onChange={(value) => updateAssumptions('safeWithdrawalRate', value)}
+              hint="Sets FI Number target (reference only)"
+              min={1}
+              max={10}
+            />
+          </div>
         </div>
 
         <div className="pt-3 border-t border-border-subtle">
-          <p className="text-xs text-text-muted mb-3">Tax Rates on Withdrawals</p>
+          <p className="text-xs text-text-muted mb-3">Federal Tax Rates</p>
           <div className="grid grid-cols-2 gap-3">
             <PercentInput
-              label="Federal Income Tax"
+              label="Income Tax"
               value={assumptions.traditionalTaxRate}
               onChange={(value) => updateAssumptions('traditionalTaxRate', value)}
-              hint="For traditional withdrawals"
+              hint="On traditional withdrawals"
               min={0}
               max={50}
             />
             <PercentInput
-              label="Federal Cap Gains"
+              label="Capital Gains"
               value={assumptions.capitalGainsTaxRate}
               onChange={(value) => updateAssumptions('capitalGainsTaxRate', value)}
-              hint="For taxable account gains"
+              hint="On taxable account gains"
               min={0}
               max={40}
             />
@@ -102,27 +113,17 @@ export function AssumptionsSection() {
         </div>
 
         <div className="pt-3 border-t border-border-subtle">
-          <PercentInput
-            label="Safe Withdrawal Rate"
-            value={assumptions.safeWithdrawalRate}
-            onChange={(value) => updateAssumptions('safeWithdrawalRate', value)}
-            hint="Used to calculate your FI number"
-            min={1}
-            max={10}
-          />
-        </div>
-
-        <div className="pt-3 border-t border-border-subtle">
-          <p className="text-xs text-text-muted mb-2">Withdrawal Order</p>
-          <div className="text-xs text-text-secondary space-y-1">
+          <p className="text-xs text-text-muted mb-2">Withdrawal Priority</p>
+          <div className="text-sm text-text-secondary">
             {assumptions.withdrawalOrder.map((source, index) => (
-              <div key={source} className="flex items-center gap-2">
-                <span className="text-text-muted">{index + 1}.</span>
+              <span key={source}>
+                {index > 0 && <span className="text-text-muted mx-1">&rarr;</span>}
+                <span className="text-text-muted">{index + 1}.</span>{' '}
                 <span className="capitalize">{source}</span>
-              </div>
+              </span>
             ))}
           </div>
-          <p className="text-xs text-text-muted mt-2 italic">
+          <p className="text-xs text-text-muted mt-1 italic">
             Taxable first for tax efficiency, Roth last for tax-free growth
           </p>
         </div>

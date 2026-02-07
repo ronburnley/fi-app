@@ -678,6 +678,27 @@ When building this app:
 
 ## Changelog
 
+### v5.5 - 2026-02-07 - Assumptions Page Rework
+
+**UI Changes:**
+- Narrowed Assumptions wizard step from `max-w-2xl` (672px) to `max-w-lg` (512px)
+- Removed card title (redundant with wizard heading)
+- Restructured into 4 labeled sections: Growth & Inflation, Federal Tax Rates, Early Withdrawal Penalties, Withdrawal Priority
+- First section uses 3-column grid: Investment Return, General Inflation, Withdrawal Rate
+- Withdrawal order changed from vertical numbered list to compact inline format with arrows
+
+**Label/Hint Fixes:**
+- "Inflation Rate" → "General Inflation" with hint "For retirement income & home cost default" (clarifies it doesn't drive per-expense inflation)
+- "Safe Withdrawal Rate" → "Withdrawal Rate" with hint "Sets FI Number target (reference only)" (clarifies it doesn't affect projections)
+- "Investment Return" hint → "Nominal annual return"
+- "Federal Income Tax" → "Income Tax" (section header provides "Federal" context)
+- "Federal Cap Gains" → "Capital Gains"
+- Tax hints changed from "For..." to "On..." phrasing
+
+**Files Modified:**
+- `src/components/wizard/steps/AssumptionsStep.tsx` - Container width change
+- `src/components/inputs/AssumptionsSection.tsx` - Full layout rework
+
 ### v5.4 - 2026-02-06 - FRA-Based Social Security Auto-Adjustment
 
 **Major Change:**
