@@ -186,6 +186,10 @@ describe('Mortgage Calculations', () => {
         ...mortgage,
         earlyPayoff: { enabled: true, payoffYear: 2030 },
       };
+      // Payoff year itself returns the remaining balance (needed for lump-sum expense)
+      const payoffYearBalance = calculateMortgageBalanceForYear(mortgageWithPayoff, 2030);
+      expect(payoffYearBalance).toBeGreaterThan(0);
+      // Year after payoff returns 0
       expect(calculateMortgageBalanceForYear(mortgageWithPayoff, 2031)).toBe(0);
     });
   });

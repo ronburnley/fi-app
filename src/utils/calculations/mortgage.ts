@@ -110,8 +110,8 @@ export function calculateMortgageBalanceForYear(
     return 0;
   }
 
-  // Check for early payoff
-  if (mortgage.earlyPayoff?.enabled && year >= mortgage.earlyPayoff.payoffYear) {
+  // Check for early payoff (return 0 only AFTER payoff year; payoff year itself needs the balance)
+  if (mortgage.earlyPayoff?.enabled && year > mortgage.earlyPayoff.payoffYear) {
     return 0;
   }
 

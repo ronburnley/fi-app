@@ -562,20 +562,20 @@ describe('Integration Tests', () => {
       expect(yearBeforePayoff.expenses).toBeCloseTo(30000 + annualMortgagePayment, -1);
       expect(yearBeforePayoff.mortgageBalance).toBeGreaterThan(0);
 
-      // Payoff year (index 5): mortgage payment stops
-      // The engine's balance function returns 0 for the payoff year (already considers it paid off),
-      // so no lump-sum payoff expense is added. Expenses = just living.
+      // Payoff year (index 5): lump-sum payoff is added to expenses, no regular payment
+      // Remaining balance is paid off as a one-time expense
       const payoffYearProjection = projections[5];
-      expect(payoffYearProjection.expenses).toBe(30000);
-      expect(payoffYearProjection.mortgageBalance).toBe(0);
+      expect(payoffYearProjection.expenses).toBeGreaterThan(30000); // living + lump-sum payoff
+      expect(payoffYearProjection.mortgageBalance).toBe(0); // balance zeroed after payoff
 
-      // Year after payoff (index 6): also just living expenses (no mortgage)
+      // Year after payoff (index 6): just living expenses (no mortgage)
       const yearAfterPayoff = projections[6];
       expect(yearAfterPayoff.expenses).toBe(30000);
       expect(yearAfterPayoff.mortgageBalance).toBe(0);
 
-      // Key assertion: year before payoff has mortgage payments, payoff year and after do not
-      expect(yearBeforePayoff.expenses).toBeGreaterThan(payoffYearProjection.expenses);
+      // Key assertion: payoff year spikes above normal, then drops to living-only
+      expect(payoffYearProjection.expenses).toBeGreaterThan(yearBeforePayoff.expenses);
+      expect(yearAfterPayoff.expenses).toBeLessThan(yearBeforePayoff.expenses);
     });
   });
 
