@@ -37,8 +37,6 @@ export function SpendingStep() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [hasHome, setHasHome] = useState(!!expenses.home);
-  const [showHomeAdvanced, setShowHomeAdvanced] = useState(false);
-  const [showMortgageAdvanced, setShowMortgageAdvanced] = useState(false);
 
   const currentYear = new Date().getFullYear();
 
@@ -428,7 +426,7 @@ export function SpendingStep() {
                 />
 
                 {expenses.home.mortgage && (
-                  <div className="pl-4 border-l-2 border-border-subtle space-y-4">
+                  <div className="space-y-4 mt-3">
                     {/* Core mortgage inputs */}
                     <div className="grid grid-cols-2 gap-3">
                       <CurrencyInput
@@ -554,68 +552,42 @@ export function SpendingStep() {
                       </div>
                     )}
 
-                    {/* Mortgage Advanced section */}
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowMortgageAdvanced(!showMortgageAdvanced)}
-                        className="group flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
-                      >
-                        <svg
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                            showMortgageAdvanced ? 'rotate-90' : ''
-                          }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                        <span className="font-medium">Advanced</span>
-                      </button>
+                    {/* Early Payoff */}
+                    <div className="pt-3 border-t border-border-subtle/50 space-y-3">
+                      <p className="text-xs font-medium text-text-muted uppercase tracking-wider">Early Payoff</p>
+                      <Toggle
+                        label="Plan to pay off early?"
+                        checked={!!expenses.home.mortgage.earlyPayoff?.enabled}
+                        onChange={toggleEarlyPayoff}
+                      />
 
-                      {showMortgageAdvanced && (
-                        <div className="mt-3 space-y-3">
-                          <Toggle
-                            label="Plan to pay off early?"
-                            checked={!!expenses.home.mortgage.earlyPayoff?.enabled}
-                            onChange={toggleEarlyPayoff}
-                          />
-
-                          {expenses.home.mortgage.earlyPayoff?.enabled && (
-                            <div className="pl-4 border-l-2 border-accent-blue/30 space-y-2">
-                              <div className="max-w-[200px]">
-                                <Input
-                                  label="Payoff Year"
-                                  type="number"
-                                  value={expenses.home.mortgage.earlyPayoff.payoffYear}
-                                  onChange={(e) =>
-                                    updateMortgage({
-                                      earlyPayoff: {
-                                        enabled: true,
-                                        payoffYear: parseInt(e.target.value) || currentYear + 5,
-                                      },
-                                    })
-                                  }
-                                  min={currentYear + 1}
-                                  max={mortgageCalcs?.endYear ?? currentYear + 30}
-                                  hint="When to pay off"
-                                />
-                              </div>
-                              {mortgageCalcs?.earlyPayoffAmount !== undefined && (
-                                <p className="text-sm text-text-muted">
-                                  Estimated payoff amount:{' '}
-                                  <span className="text-text-primary font-medium tabular-nums">
-                                    {formatCurrencyCompact(mortgageCalcs.earlyPayoffAmount)}
-                                  </span>
-                                </p>
-                              )}
-                            </div>
+                      {expenses.home.mortgage.earlyPayoff?.enabled && (
+                        <div className="space-y-2">
+                          <div className="max-w-[200px]">
+                            <Input
+                              label="Payoff Year"
+                              type="number"
+                              value={expenses.home.mortgage.earlyPayoff.payoffYear}
+                              onChange={(e) =>
+                                updateMortgage({
+                                  earlyPayoff: {
+                                    enabled: true,
+                                    payoffYear: parseInt(e.target.value) || currentYear + 5,
+                                  },
+                                })
+                              }
+                              min={currentYear + 1}
+                              max={mortgageCalcs?.endYear ?? currentYear + 30}
+                              hint="When to pay off"
+                            />
+                          </div>
+                          {mortgageCalcs?.earlyPayoffAmount !== undefined && (
+                            <p className="text-sm text-text-muted">
+                              Estimated payoff amount:{' '}
+                              <span className="text-text-primary font-medium tabular-nums">
+                                {formatCurrencyCompact(mortgageCalcs.earlyPayoffAmount)}
+                              </span>
+                            </p>
                           )}
                         </div>
                       )}
@@ -624,43 +596,16 @@ export function SpendingStep() {
                 )}
               </div>
 
-              {/* Home Advanced: Inflation rate for taxes/insurance */}
-              <div className="pt-3 border-t border-border-subtle/50">
-                <button
-                  type="button"
-                  onClick={() => setShowHomeAdvanced(!showHomeAdvanced)}
-                  className="group flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
-                >
-                  <svg
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      showHomeAdvanced ? 'rotate-90' : ''
-                    }`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                  <span className="font-medium">Advanced</span>
-                </button>
-
-                {showHomeAdvanced && (
-                  <div className="mt-3 max-w-[200px]">
-                    <PercentInput
-                      label="Tax/Insurance Inflation"
-                      value={expenses.home.inflationRate}
-                      onChange={(value) => updateHomeExpense({ inflationRate: value })}
-                      hint="Annual increase rate"
-                      min={0}
-                      max={15}
-                    />
-                  </div>
-                )}
+              {/* Tax/Insurance Inflation */}
+              <div className="pt-3 border-t border-border-subtle/50 max-w-[200px]">
+                <PercentInput
+                  label="Tax/Insurance Inflation"
+                  value={expenses.home.inflationRate}
+                  onChange={(value) => updateHomeExpense({ inflationRate: value })}
+                  hint="Annual increase for property tax & insurance"
+                  min={0}
+                  max={15}
+                />
               </div>
             </div>
           )}

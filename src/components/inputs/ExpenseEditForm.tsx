@@ -21,7 +21,6 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
   const [startYear, setStartYear] = useState(expense?.startYear ?? currentYear + 1);
   const [hasEndYear, setHasEndYear] = useState(!!expense?.endYear);
   const [endYear, setEndYear] = useState(expense?.endYear ?? currentYear + 10);
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,43 +132,16 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
             )}
           </div>
 
-          {/* Advanced: Inflation rate */}
-          <div className="pt-3 border-t border-border-subtle/50">
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="group flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
-            >
-              <svg
-                className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                  showAdvanced ? 'rotate-90' : ''
-                }`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-              <span className="font-medium">Advanced</span>
-            </button>
-
-            {showAdvanced && (
-              <div className="mt-3 max-w-[200px]">
-                <PercentInput
-                  label="Inflation Rate"
-                  value={inflationRate}
-                  onChange={setInflationRate}
-                  hint="Default is 3%"
-                  min={0}
-                  max={15}
-                />
-              </div>
-            )}
+          {/* Inflation rate */}
+          <div className="pt-3 border-t border-border-subtle/50 max-w-[200px]">
+            <PercentInput
+              label="Inflation Rate"
+              value={inflationRate}
+              onChange={setInflationRate}
+              hint="Default is 3%"
+              min={0}
+              max={15}
+            />
           </div>
 
           {/* Actions */}
