@@ -232,12 +232,10 @@ describe('Integration Tests', () => {
         income: {
           employment: {
             annualGrossIncome: 150000,
-            annualContributions: 0,
             effectiveTaxRate: 0.25,
           },
           spouseEmployment: {
             annualGrossIncome: 100000,
-            annualContributions: 0,
             effectiveTaxRate: 0.22,
           },
           spouseAdditionalWorkYears: 3,
@@ -294,26 +292,29 @@ describe('Integration Tests', () => {
       expect(projections[7].employmentIncome).toBe(0);
     });
 
-    it('routes spouse contributions correctly during extended work period', () => {
+    it('per-account contributions continue based on year bounds regardless of employment', () => {
+      const currentYear = new Date().getFullYear();
       const state = createTestState({
         profile: { currentAge: 48, targetFIAge: 50, lifeExpectancy: 60, state: 'TX', filingStatus: 'married', spouseAge: 46 },
         assets: {
           accounts: [
-            { id: 'trad-spouse', name: 'Spouse 401k', type: 'traditional', owner: 'spouse', balance: 100000 },
+            {
+              id: 'trad-spouse', name: 'Spouse 401k', type: 'traditional', owner: 'spouse', balance: 100000,
+              annualContribution: 20000,
+              contributionStartYear: currentYear,
+              contributionEndYear: currentYear + 5,
+            },
             { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'joint', balance: 200000, costBasis: 150000 },
           ],
         },
         income: {
           employment: {
             annualGrossIncome: 150000,
-            annualContributions: 0,
             effectiveTaxRate: 0.25,
           },
           spouseEmployment: {
             annualGrossIncome: 100000,
-            annualContributions: 20000,
             effectiveTaxRate: 0.22,
-            contributionAccountId: 'trad-spouse',
           },
           spouseAdditionalWorkYears: 2,
           retirementIncomes: [],
@@ -340,17 +341,16 @@ describe('Integration Tests', () => {
 
       const projections = calculateProjection(state);
 
-      // Age 48 (index 0): Both working, spouse contributing 20k to trad-spouse
+      // Age 48 (index 0): Contributing 20k to spouse 401k
       expect(projections[0].contributions).toBe(20000);
-      // Spouse 401k should receive contributions: 100000 + 20000 = 120000
+      // Spouse 401k: 100000 + 20000 = 120000
       expect(projections[0].traditionalBalance).toBe(120000);
 
-      // Age 50 (index 2): Primary stopped, spouse still working and contributing
-      // Spouse still contributes while working
+      // Age 50 (index 2): Contributions continue (within year bounds)
       expect(projections[2].contributions).toBe(20000);
 
-      // Age 52 (index 4): Spouse stopped (48's FI age 50 + 2 = 52, selfAge 52 >= 52)
-      expect(projections[4].contributions).toBe(0);
+      // Age 54 (index 6): Past endYear, contributions stop
+      expect(projections[6].contributions).toBe(0);
     });
   });
 
@@ -701,7 +701,6 @@ describe('Integration Tests', () => {
         income: {
           employment: {
             annualGrossIncome: 150000,
-            annualContributions: 0,
             effectiveTaxRate: 0.25,
           },
           retirementIncomes: [],
@@ -738,7 +737,6 @@ describe('Integration Tests', () => {
         income: {
           employment: {
             annualGrossIncome: 150000,
-            annualContributions: 0,
             effectiveTaxRate: 0.25,
           },
           retirementIncomes: [],
@@ -775,7 +773,6 @@ describe('Integration Tests', () => {
         income: {
           employment: {
             annualGrossIncome: 150000,
-            annualContributions: 0,
             effectiveTaxRate: 0.25,
           },
           retirementIncomes: [],
@@ -812,8 +809,8 @@ describe('Integration Tests', () => {
         assets: {
           accounts: [
             { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'joint', balance: 1000000, costBasis: 600000 },
-            { id: 'trad-1', name: 'Trad 401k', type: 'traditional', owner: 'self', balance: 800000, is401k: true },
-            { id: 'roth-1', name: 'Roth IRA', type: 'roth', owner: 'self', balance: 300000 },
+            { id: 'trad-1', name: 'Trad 401k', type: 'traditional', owner: 'self', balance: 800000, is401k: true, annualContribution: 23000 },
+            { id: 'roth-1', name: 'Roth IRA', type: 'roth', owner: 'self', balance: 300000, annualContribution: 15000 },
           ],
           pension: {
             annualBenefit: 24000,
@@ -824,13 +821,10 @@ describe('Integration Tests', () => {
         income: {
           employment: {
             annualGrossIncome: 180000,
-            annualContributions: 23000,
             effectiveTaxRate: 0.25,
-            contributionAccountId: 'trad-1',
           },
           spouseEmployment: {
             annualGrossIncome: 120000,
-            annualContributions: 15000,
             effectiveTaxRate: 0.22,
           },
           spouseAdditionalWorkYears: 2,

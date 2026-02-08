@@ -204,7 +204,6 @@ describe('Employment Income Calculations', () => {
       income: {
         employment: {
           annualGrossIncome: 150000,
-          annualContributions: 23000,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -214,10 +213,9 @@ describe('Employment Income Calculations', () => {
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Net = Gross - Tax - Contributions
-    // Net = 150000 - 37500 - 23000 = 89500
-    expect(year1.employmentIncome).toBe(89500);
-    expect(year1.contributions).toBe(23000);
+    // Net = Gross - Tax
+    // Net = 150000 - 37500 = 112500
+    expect(year1.employmentIncome).toBe(112500);
     expect(year1.phase).toBe('accumulating');
   });
 
@@ -226,12 +224,10 @@ describe('Employment Income Calculations', () => {
       income: {
         employment: {
           annualGrossIncome: 150000,
-          annualContributions: 23000,
           effectiveTaxRate: 0.25,
         },
         spouseEmployment: {
           annualGrossIncome: 100000,
-          annualContributions: 15000,
           effectiveTaxRate: 0.22,
         },
         retirementIncomes: [],
@@ -241,11 +237,10 @@ describe('Employment Income Calculations', () => {
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Self: Net = 150000 - 37500 - 23000 = 89500
-    // Spouse: Net = 100000 - 22000 - 15000 = 63000
-    // Combined Net = 152500
-    expect(year1.employmentIncome).toBe(152500);
-    expect(year1.contributions).toBe(38000);
+    // Self: Net = 150000 - 37500 = 112500
+    // Spouse: Net = 100000 - 22000 = 78000
+    // Combined Net = 190500
+    expect(year1.employmentIncome).toBe(190500);
   });
 
   it('stops employment income at FI age', () => {
@@ -254,7 +249,6 @@ describe('Employment Income Calculations', () => {
       income: {
         employment: {
           annualGrossIncome: 150000,
-          annualContributions: 23000,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -264,9 +258,10 @@ describe('Employment Income Calculations', () => {
     const projections = calculateProjection(state);
 
     // Age 50-54: Still accumulating, employment active
-    expect(projections[0].employmentIncome).toBe(89500);
+    // Net = 150000 - 37500 = 112500
+    expect(projections[0].employmentIncome).toBe(112500);
     expect(projections[0].phase).toBe('accumulating');
-    expect(projections[4].employmentIncome).toBe(89500);
+    expect(projections[4].employmentIncome).toBe(112500);
 
     // Age 55: FI — no employment
     expect(projections[5].employmentIncome).toBe(0);
@@ -279,12 +274,10 @@ describe('Employment Income Calculations', () => {
       income: {
         employment: {
           annualGrossIncome: 150000,
-          annualContributions: 0,
           effectiveTaxRate: 0.25,
         },
         spouseEmployment: {
           annualGrossIncome: 100000,
-          annualContributions: 0,
           effectiveTaxRate: 0.22,
         },
         spouseAdditionalWorkYears: 3,
@@ -323,7 +316,6 @@ describe('Phase Determination', () => {
       income: {
         employment: {
           annualGrossIncome: 100000,
-          annualContributions: 0,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -344,7 +336,6 @@ describe('Phase Determination', () => {
       income: {
         employment: {
           annualGrossIncome: 100000,
-          annualContributions: 0,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -365,7 +356,6 @@ describe('Phase Determination', () => {
       income: {
         employment: {
           annualGrossIncome: 100000,
-          annualContributions: 0,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -683,13 +673,13 @@ describe('Withdrawal Penalties', () => {
 
 // ==================== Contribution Distribution ====================
 
-describe('Contribution Distribution', () => {
-  it('adds contributions to linked account', () => {
+describe('Per-Account Contributions', () => {
+  it('adds contributions to accounts based on annualContribution field', () => {
     const state = createTestState({
       profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 60, state: 'TX', filingStatus: 'single' },
       assets: {
         accounts: [
-          { id: 'trad-1', name: 'Traditional 401k', type: 'traditional', owner: 'self', balance: 100000, is401k: true },
+          { id: 'trad-1', name: 'Traditional 401k', type: 'traditional', owner: 'self', balance: 100000, is401k: true, annualContribution: 23000 },
           { id: 'roth-1', name: 'Roth IRA', type: 'roth', owner: 'self', balance: 100000 },
           { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 50000, costBasis: 40000 },
         ],
@@ -697,9 +687,7 @@ describe('Contribution Distribution', () => {
       income: {
         employment: {
           annualGrossIncome: 150000,
-          annualContributions: 23000,
           effectiveTaxRate: 0.25,
-          contributionAccountId: 'trad-1', // Linked to traditional
         },
         retirementIncomes: [],
       },
@@ -712,65 +700,87 @@ describe('Contribution Distribution', () => {
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Net income = 150000 - 37500 - 23000 = 89500
-    // Expenses = 50000
-    // Surplus = 39500 (goes to taxable)
-    // Traditional: 100000 + 23000 = 123000
+    // Traditional: 100000 + 23000 contribution = 123000
     expect(year1.traditionalBalance).toBe(123000);
-
     // Roth should not receive contributions (stays at 100000)
     expect(year1.rothBalance).toBe(100000);
-
-    // Verify contributions went to the right place
     expect(year1.contributions).toBe(23000);
   });
 
-  it('distributes contributions proportionally when mixed', () => {
+  it('respects contributionStartYear and contributionEndYear bounds', () => {
+    const currentYear = new Date().getFullYear();
+    const state = createTestState({
+      profile: { currentAge: 45, targetFIAge: 45, lifeExpectancy: 55, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          {
+            id: 'trad-1', name: 'Traditional', type: 'traditional', owner: 'self', balance: 100000,
+            annualContribution: 20000,
+            contributionStartYear: currentYear + 2,
+            contributionEndYear: currentYear + 4,
+          },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, inflationRate: 0, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0, inflationRate: 0,
+        traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Year 0-1: Before start year, no contributions
+    expect(projections[0].contributions).toBe(0);
+    expect(projections[1].contributions).toBe(0);
+
+    // Year 2-4: Within range, contributions active
+    expect(projections[2].contributions).toBe(20000);
+    expect(projections[3].contributions).toBe(20000);
+    expect(projections[4].contributions).toBe(20000);
+
+    // Year 5+: After end year, no contributions
+    expect(projections[5].contributions).toBe(0);
+  });
+
+  it('multiple accounts with overlapping contribution schedules', () => {
     const state = createTestState({
       profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 60, state: 'TX', filingStatus: 'single' },
       assets: {
         accounts: [
-          { id: 'trad-1', name: 'Traditional', type: 'traditional', owner: 'self', balance: 300000 },
-          { id: 'roth-1', name: 'Roth', type: 'roth', owner: 'self', balance: 100000 },
-          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 50000, costBasis: 40000 },
+          { id: 'trad-1', name: 'Traditional', type: 'traditional', owner: 'self', balance: 200000, annualContribution: 23000 },
+          { id: 'roth-1', name: 'Roth', type: 'roth', owner: 'self', balance: 100000, annualContribution: 7000 },
         ],
       },
       income: {
-        employment: {
-          annualGrossIncome: 150000,
-          annualContributions: 20000,
-          effectiveTaxRate: 0.25,
-          contributionType: 'mixed',
-        },
+        employment: { annualGrossIncome: 200000, effectiveTaxRate: 0.25 },
         retirementIncomes: [],
       },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
         categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' }],
       },
-      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
     });
 
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Net income = 150000 - 37500 - 20000 = 92500
-    // Expenses = 50000
-    // Surplus = 42500 (goes to taxable)
-
-    // 75% of contributions should go to traditional (300k/400k)
-    // 25% to roth (100k/400k)
-    // Traditional: 300000 + 15000 = 315000
-    // Roth: 100000 + 5000 = 105000
-    expect(year1.traditionalBalance).toBe(315000);
-    expect(year1.rothBalance).toBe(105000);
-    expect(year1.contributions).toBe(20000);
+    expect(year1.contributions).toBe(30000);
+    expect(year1.traditionalBalance).toBe(223000);
+    expect(year1.rothBalance).toBe(107000);
   });
 });
 
 // ==================== Surplus Handling ====================
 
 describe('Surplus Handling', () => {
-  it('adds surplus to taxable account during working years', () => {
+  it('does NOT auto-deposit surplus — surplus is ignored', () => {
     const state = createTestState({
       profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 60, state: 'TX', filingStatus: 'single' },
       assets: {
@@ -781,7 +791,6 @@ describe('Surplus Handling', () => {
       income: {
         employment: {
           annualGrossIncome: 150000,
-          annualContributions: 0,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],
@@ -794,11 +803,10 @@ describe('Surplus Handling', () => {
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Net income = 150000 - 37500 = 112500
-    // Surplus = 112500 - 50000 = 62500
-    // Taxable should increase by surplus
-    expect(year1.taxableBalance).toBeCloseTo(162500, -2);
-    expect(year1.withdrawalSource).toBe('Savings');
+    // Net income = 150000 - 37500 = 112500 > expenses 50000
+    // Surplus is NOT deposited — balance stays at 100000 (before growth)
+    expect(year1.taxableBalance).toBe(100000);
+    expect(year1.withdrawalSource).toBe('N/A');
   });
 });
 
@@ -914,7 +922,6 @@ describe('Achievable FI Age', () => {
       income: {
         employment: {
           annualGrossIncome: 200000,
-          annualContributions: 0,
           effectiveTaxRate: 0.25,
         },
         retirementIncomes: [],

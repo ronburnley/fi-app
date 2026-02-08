@@ -18,7 +18,7 @@ The app **calculates** the earliest achievable FI age via binary search — the 
 
 | Phase | When | What happens |
 |-------|------|-------------|
-| **Accumulating** | age < FI age | Employment income covers expenses, contributions grow retirement accounts, surplus saved to taxable. |
+| **Accumulating** | age < FI age | Employment income covers expenses, per-account contributions grow balances. Surplus (income > expenses) is untracked. |
 | **FI** | age >= FI age | No employment. Portfolio + passive income (SS, pension, retirement streams) sustain spending via withdrawals. |
 
 There is no "gap" phase. FI age = when employment stops.
@@ -31,7 +31,7 @@ There is no "gap" phase. FI age = when employment stops.
 |------|---------|
 | `src/types/index.ts` | All TypeScript interfaces (source of truth for data model) |
 | `src/utils/calculations/` | Projection engine split into 10 modules (types, mortgage, socialSecurity, withdrawals, balances, expenses, projection, summary, fiSearch, index) |
-| `src/utils/calculations.test.ts` | 46 unit tests (Vitest) |
+| `src/utils/calculations.test.ts` | 47 unit tests (Vitest) |
 | `src/utils/calculations.integration.test.ts` | 16 integration tests (multi-system scenarios) |
 | `src/hooks/useProjection.ts` | Memoized projection hook |
 | `src/hooks/useAchievableFI.ts` | Binary search for earliest FI age |
@@ -61,13 +61,14 @@ FI age is auto-calculated and shown in the header starting at step 2.
 For each year from `currentAge` to `lifeExpectancy`:
 
 1. **Determine phase** — accumulating or FI based on age vs FI age
-2. **If accumulating:** Calculate employment income (gross - tax - contributions), add contributions to linked accounts, save surplus to taxable
-3. **Calculate expenses** — inflation-adjusted base + per-item expenses + life events
-4. **Calculate passive income** — Social Security (FRA-adjusted + COLA), pension (+ COLA), retirement income streams
-5. **Calculate gap** — expenses minus all income
-6. **If gap > 0:** Withdraw from accounts in priority order (penalty-free first within each type)
-7. **Grow balances** — apply investment return to remaining balances
-8. **Track mortgage** — amortization, early payoff if configured
+2. **Add per-account contributions** — each account with `annualContribution` gets funded if year is within [startYear, endYear]. Contributions are phase-independent (date-bounded, not tied to employment).
+3. **Calculate employment income** — gross - tax (net income). Surplus (income > expenses) is ignored.
+4. **Calculate expenses** — inflation-adjusted base + per-item expenses + life events
+5. **Calculate passive income** — Social Security (FRA-adjusted + COLA), pension (+ COLA), retirement income streams
+6. **Calculate gap** — expenses minus all income
+7. **If gap > 0:** Withdraw from accounts in priority order (penalty-free first within each type)
+8. **Grow balances** — apply investment return to remaining balances
+9. **Track mortgage** — amortization, early payoff if configured
 
 ### Withdrawal Priority & Penalties
 
@@ -139,6 +140,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v7.0 | 2026-02-08 | **Per-Account Contributions** — Moved contributions from employment to individual accounts (`annualContribution` + start/end year). Removed surplus auto-deposit. Simplified `EmploymentIncome` to gross + tax rate. 63 tests (47 unit + 16 integration). |
 | v6.1 | 2026-02-07 | **Engine Refactor** — Split 1545-line `calculations.ts` into 10 focused modules under `calculations/`. Added 16 integration tests (62 total). Zero logic changes. |
 | v6.0 | 2026-02-07 | **FI Age Model Rework** — Removed retirement age (`endAge`). FI age IS when employment stops. Two phases (accumulating/fi), no gap. Spouse additional work years. Shortfall guidance. |
 | v5.5 | 2026-02-07 | Assumptions page layout rework (narrower, 4 sections, clearer labels) |

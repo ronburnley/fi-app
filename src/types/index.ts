@@ -34,6 +34,9 @@ export interface Asset {
   costBasis?: number;          // Taxable accounts only
   is401k?: boolean;            // For Rule of 55 eligibility
   separatedFromService?: boolean; // Rule of 55: left employer at 55+
+  annualContribution?: number;       // Annual contribution amount (e.g. 23000)
+  contributionStartYear?: number;    // undefined = current year
+  contributionEndYear?: number;      // undefined = contributes every year
 }
 
 export interface Assets {
@@ -139,16 +142,10 @@ export interface LifeEvent {
 
 // ==================== Income Modeling ====================
 
-// Contribution account type for auto-creation
-export type ContributionAccountType = 'traditional' | 'roth' | 'hsa' | 'mixed';
-
 // Employment income during working years
 export interface EmploymentIncome {
   annualGrossIncome: number;      // Pre-tax salary
-  annualContributions: number;    // Total 401k/IRA/HSA contributions
   effectiveTaxRate: number;       // Combined fed+state (decimal, e.g., 0.25)
-  contributionAccountId?: string;    // Link to specific account for contributions
-  contributionType?: ContributionAccountType;  // Type for auto-creation (default: 'traditional')
 }
 
 // Retirement income streams beyond SS/pension (consulting, rentals, etc.)

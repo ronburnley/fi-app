@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { RetirementIncomeEditForm } from '../../inputs/RetirementIncomeEditForm';
-import { CurrencyInput, PercentInput, Toggle, Input, Select } from '../../ui';
-import type { Asset, EmploymentIncome, RetirementIncome, ContributionAccountType, AccountOwner, Income } from '../../../types';
+import { CurrencyInput, PercentInput, Toggle, Input } from '../../ui';
+import type { EmploymentIncome, RetirementIncome, Income } from '../../../types';
 
 function formatCurrencyCompact(n: number): string {
   return n.toLocaleString('en-US', {
@@ -14,50 +14,15 @@ function formatCurrencyCompact(n: number): string {
   });
 }
 
-function getRetirementAccountsForOwner(accounts: Asset[], owner: AccountOwner) {
-  return accounts.filter(
-    (a) => (a.type === 'traditional' || a.type === 'roth' || a.type === 'hsa') &&
-      (a.owner === owner || a.owner === 'joint')
-  );
-}
-
-function buildContributionOptions(accounts: Asset[], ownerLabel: string) {
-  const options = accounts.map(a => ({
-    value: a.id,
-    label: a.name,
-  }));
-
-  return [
-    ...options,
-    { value: 'create-traditional', label: `Create ${ownerLabel} Traditional 401(k)` },
-    { value: 'create-roth', label: `Create ${ownerLabel} Roth 401(k)` },
-    { value: 'split', label: 'Split across all retirement accounts' },
-  ];
-}
-
 export function IncomeStep() {
   const { state, dispatch } = useApp();
-  const { income, profile, assets } = state;
+  const { income, profile } = state;
   const isMarried = profile.filingStatus === 'married';
-
-  const selfRetirementAccounts = getRetirementAccountsForOwner(assets.accounts, 'self');
-  const spouseRetirementAccounts = getRetirementAccountsForOwner(assets.accounts, 'spouse');
 
   const [hasEmployment, setHasEmployment] = useState(!!income.employment);
   const [hasSpouseEmployment, setHasSpouseEmployment] = useState(!!income.spouseEmployment);
   const [editingRetirementIncome, setEditingRetirementIncome] = useState<RetirementIncome | null>(null);
   const [isAddingRetirementIncome, setIsAddingRetirementIncome] = useState(false);
-
-  // Helper to find default contribution destination
-  const findDefaultContributionAccount = (accounts: typeof selfRetirementAccounts) => {
-    // Prefer traditional 401k, then any traditional, then first retirement account
-    const traditional401k = accounts.find(a => a.type === 'traditional' && a.is401k);
-    if (traditional401k) return traditional401k.id;
-    const traditional = accounts.find(a => a.type === 'traditional');
-    if (traditional) return traditional.id;
-    if (accounts.length > 0) return accounts[0].id;
-    return undefined;
-  };
 
   // Spouse additional work years
   const [spouseAdditionalYears, setSpouseAdditionalYears] = useState<number>(
@@ -70,10 +35,7 @@ export function IncomeStep() {
     if (existing) return existing;
     return {
       annualGrossIncome: 150000,
-      annualContributions: 23000,
       effectiveTaxRate: 0.28,
-      contributionAccountId: findDefaultContributionAccount(selfRetirementAccounts),
-      contributionType: 'traditional',
     };
   });
 
@@ -82,10 +44,7 @@ export function IncomeStep() {
     if (existing) return existing;
     return {
       annualGrossIncome: 100000,
-      annualContributions: 15000,
       effectiveTaxRate: 0.25,
-      contributionAccountId: findDefaultContributionAccount(spouseRetirementAccounts),
-      contributionType: 'traditional',
     };
   });
 
@@ -109,7 +68,7 @@ export function IncomeStep() {
   };
 
   // Update self employment field
-  const updateSelfField = (field: keyof EmploymentIncome, value: number | string | undefined) => {
+  const updateSelfField = (field: keyof EmploymentIncome, value: number) => {
     const updated = { ...selfEmployment, [field]: value };
     setSelfEmployment(updated);
     if (hasEmployment) {
@@ -118,85 +77,13 @@ export function IncomeStep() {
   };
 
   // Update spouse employment field
-  const updateSpouseField = (field: keyof EmploymentIncome, value: number | string | undefined) => {
+  const updateSpouseField = (field: keyof EmploymentIncome, value: number) => {
     const updated = { ...spouseEmployment, [field]: value };
     setSpouseEmployment(updated);
     if (hasSpouseEmployment) {
       dispatch({ type: 'UPDATE_SPOUSE_EMPLOYMENT', payload: updated });
     }
   };
-
-  // Handle contribution destination change for self
-  const handleSelfContributionDestinationChange = (value: string) => {
-    if (value === 'create-traditional') {
-      updateSelfField('contributionType', 'traditional' as ContributionAccountType);
-      updateSelfField('contributionAccountId', undefined);
-    } else if (value === 'create-roth') {
-      updateSelfField('contributionType', 'roth' as ContributionAccountType);
-      updateSelfField('contributionAccountId', undefined);
-    } else if (value === 'split') {
-      updateSelfField('contributionType', 'mixed' as ContributionAccountType);
-      updateSelfField('contributionAccountId', undefined);
-    } else {
-      // Existing account selected
-      const updated = {
-        ...selfEmployment,
-        contributionAccountId: value,
-        contributionType: undefined
-      };
-      setSelfEmployment(updated);
-      if (hasEmployment) {
-        dispatch({ type: 'UPDATE_EMPLOYMENT', payload: updated });
-      }
-    }
-  };
-
-  // Handle contribution destination change for spouse
-  const handleSpouseContributionDestinationChange = (value: string) => {
-    if (value === 'create-traditional') {
-      updateSpouseField('contributionType', 'traditional' as ContributionAccountType);
-      updateSpouseField('contributionAccountId', undefined);
-    } else if (value === 'create-roth') {
-      updateSpouseField('contributionType', 'roth' as ContributionAccountType);
-      updateSpouseField('contributionAccountId', undefined);
-    } else if (value === 'split') {
-      updateSpouseField('contributionType', 'mixed' as ContributionAccountType);
-      updateSpouseField('contributionAccountId', undefined);
-    } else {
-      // Existing account selected
-      const updated = {
-        ...spouseEmployment,
-        contributionAccountId: value,
-        contributionType: undefined
-      };
-      setSpouseEmployment(updated);
-      if (hasSpouseEmployment) {
-        dispatch({ type: 'UPDATE_SPOUSE_EMPLOYMENT', payload: updated });
-      }
-    }
-  };
-
-  // Get current contribution destination value for dropdown
-  const getSelfContributionDestination = (): string => {
-    if (selfEmployment.contributionAccountId) {
-      return selfEmployment.contributionAccountId;
-    }
-    if (selfEmployment.contributionType === 'mixed') return 'split';
-    if (selfEmployment.contributionType === 'roth') return 'create-roth';
-    return 'create-traditional';
-  };
-
-  const getSpouseContributionDestination = (): string => {
-    if (spouseEmployment.contributionAccountId) {
-      return spouseEmployment.contributionAccountId;
-    }
-    if (spouseEmployment.contributionType === 'mixed') return 'split';
-    if (spouseEmployment.contributionType === 'roth') return 'create-roth';
-    return 'create-traditional';
-  };
-
-  const selfContributionOptions = buildContributionOptions(selfRetirementAccounts, '');
-  const spouseContributionOptions = buildContributionOptions(spouseRetirementAccounts, "Spouse's");
 
   // Retirement income handlers
   const handleAddRetirementIncome = (ri: RetirementIncome) => {
@@ -252,29 +139,12 @@ export function IncomeStep() {
 
             {hasEmployment && (
               <div className="mt-4 space-y-4 pl-0">
-                <div className="grid grid-cols-2 gap-3">
-                  <CurrencyInput
-                    label="Annual Gross Income"
-                    value={selfEmployment.annualGrossIncome}
-                    onChange={(v) => updateSelfField('annualGrossIncome', v)}
-                    hint="Before taxes"
-                  />
-                  <CurrencyInput
-                    label="Annual Contributions"
-                    value={selfEmployment.annualContributions}
-                    onChange={(v) => updateSelfField('annualContributions', v)}
-                    hint="401k, IRA, HSA"
-                  />
-                </div>
-                {selfEmployment.annualContributions > 0 && (
-                  <Select
-                    label="Contribution Destination"
-                    value={getSelfContributionDestination()}
-                    onChange={(value) => handleSelfContributionDestinationChange(String(value))}
-                    options={selfContributionOptions}
-                    hint="Where contributions are deposited"
-                  />
-                )}
+                <CurrencyInput
+                  label="Annual Gross Income"
+                  value={selfEmployment.annualGrossIncome}
+                  onChange={(v) => updateSelfField('annualGrossIncome', v)}
+                  hint="Before taxes"
+                />
                 <PercentInput
                   label="Effective Tax Rate"
                   value={selfEmployment.effectiveTaxRate}
@@ -298,29 +168,12 @@ export function IncomeStep() {
 
               {hasSpouseEmployment && (
                 <div className="mt-4 space-y-4 pl-0">
-                  <div className="grid grid-cols-2 gap-3">
-                    <CurrencyInput
-                      label="Spouse Annual Gross"
-                      value={spouseEmployment.annualGrossIncome}
-                      onChange={(v) => updateSpouseField('annualGrossIncome', v)}
-                      hint="Before taxes"
-                    />
-                    <CurrencyInput
-                      label="Spouse Contributions"
-                      value={spouseEmployment.annualContributions}
-                      onChange={(v) => updateSpouseField('annualContributions', v)}
-                      hint="401k, IRA, HSA"
-                    />
-                  </div>
-                  {spouseEmployment.annualContributions > 0 && (
-                    <Select
-                      label="Contribution Destination"
-                      value={getSpouseContributionDestination()}
-                      onChange={(value) => handleSpouseContributionDestinationChange(String(value))}
-                      options={spouseContributionOptions}
-                      hint="Where contributions are deposited"
-                    />
-                  )}
+                  <CurrencyInput
+                    label="Spouse Annual Gross"
+                    value={spouseEmployment.annualGrossIncome}
+                    onChange={(v) => updateSpouseField('annualGrossIncome', v)}
+                    hint="Before taxes"
+                  />
                   <PercentInput
                     label="Spouse Tax Rate"
                     value={spouseEmployment.effectiveTaxRate}

@@ -30,6 +30,9 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
   const [costBasis, setCostBasis] = useState(asset?.costBasis ?? 0);
   const [is401k, setIs401k] = useState(asset?.is401k ?? false);
   const [separatedFromService, setSeparatedFromService] = useState(asset?.separatedFromService ?? false);
+  const [annualContribution, setAnnualContribution] = useState(asset?.annualContribution ?? 0);
+  const [contributionStartYear, setContributionStartYear] = useState(asset?.contributionStartYear ?? new Date().getFullYear());
+  const [contributionEndYear, setContributionEndYear] = useState(asset?.contributionEndYear ?? new Date().getFullYear() + 20);
 
   // Reset owner to 'self' if not married and owner was spouse
   const [prevIsMarried, setPrevIsMarried] = useState(isMarried);
@@ -69,6 +72,12 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
       if (separatedFromService) {
         newAsset.separatedFromService = true;
       }
+    }
+
+    if (annualContribution > 0) {
+      newAsset.annualContribution = annualContribution;
+      newAsset.contributionStartYear = contributionStartYear;
+      newAsset.contributionEndYear = contributionEndYear;
     }
 
     onSave(newAsset);
@@ -192,6 +201,37 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
               )}
             </div>
           )}
+
+          {/* Contributions */}
+          <div className="pt-3 border-t border-zinc-800 space-y-3">
+            <CurrencyInput
+              label="Annual Contribution"
+              value={annualContribution}
+              onChange={setAnnualContribution}
+              hint="Amount added each year (e.g. 401k, IRA)"
+            />
+
+            {annualContribution > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Start Year"
+                  type="number"
+                  value={contributionStartYear}
+                  onChange={(e) => setContributionStartYear(parseInt(e.target.value) || new Date().getFullYear())}
+                  min={2000}
+                  max={2100}
+                />
+                <Input
+                  label="End Year"
+                  type="number"
+                  value={contributionEndYear}
+                  onChange={(e) => setContributionEndYear(parseInt(e.target.value) || new Date().getFullYear() + 20)}
+                  min={2000}
+                  max={2100}
+                />
+              </div>
+            )}
+          </div>
 
           <div className="flex gap-3 pt-3">
             {asset && onDelete && (

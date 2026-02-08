@@ -29,7 +29,8 @@ export function determinePhase(
 
 /**
  * Calculate total employment income for a given year
- * Returns gross, net (after tax and contributions), tax, and contribution amounts
+ * Returns gross, net (after tax), and tax amounts.
+ * Net = gross - tax. Contributions are handled per-account on the Assets page.
  *
  * Primary employment stops at fiAge. Spouse employment stops at
  * fiAge + spouseAdditionalWorkYears (on primary's age calendar).
@@ -44,14 +45,11 @@ export function calculateEmploymentIncome(
   spouseAdditionalWorkYears: number = 0
 ): EmploymentIncomeResult {
   let grossIncome = 0;
-  let selfContributions = 0;
-  let spouseContributions = 0;
   let tax = 0;
 
   // Self employment income: stops at FI age
   if (selfEmployment && selfAge < fiAge) {
     grossIncome += selfEmployment.annualGrossIncome;
-    selfContributions = selfEmployment.annualContributions;
     tax += selfEmployment.annualGrossIncome * selfEmployment.effectiveTaxRate;
   }
 
@@ -59,21 +57,15 @@ export function calculateEmploymentIncome(
   const spouseStopAge = fiAge + spouseAdditionalWorkYears;
   if (filingStatus === 'married' && spouseEmployment && spouseAge !== undefined && selfAge < spouseStopAge) {
     grossIncome += spouseEmployment.annualGrossIncome;
-    spouseContributions = spouseEmployment.annualContributions;
     tax += spouseEmployment.annualGrossIncome * spouseEmployment.effectiveTaxRate;
   }
 
-  const contributions = selfContributions + spouseContributions;
-  // Net = gross - tax - contributions (contributions go to accounts, not spending)
-  const netIncome = grossIncome - tax - contributions;
+  const netIncome = grossIncome - tax;
 
   return {
     grossIncome,
     netIncome,
     tax,
-    contributions,
-    selfContributions,
-    spouseContributions,
   };
 }
 

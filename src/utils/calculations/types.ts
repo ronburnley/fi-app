@@ -28,9 +28,6 @@ export interface EmploymentIncomeResult {
   grossIncome: number;
   netIncome: number;
   tax: number;
-  contributions: number;        // Total contributions (self + spouse)
-  selfContributions: number;    // Self contributions only
-  spouseContributions: number;  // Spouse contributions only
 }
 
 export interface YearExpenseResult {

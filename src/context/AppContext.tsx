@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useReducer, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
-import type { AppState, AppAction, WhatIfAdjustments, SyncStatus, Asset, AccountType } from '../types';
+import type { AppState, AppAction, WhatIfAdjustments, SyncStatus } from '../types';
 import { DEFAULT_STATE, DEFAULT_WHAT_IF, DEFAULT_INCOME, STORAGE_KEY } from '../constants/defaults';
 
 // Check if we should bypass auth for local development
@@ -12,7 +12,6 @@ import {
   migrateLegacyExpenses,
   needsMortgageMigration,
   migrateHomeExpense,
-  generateId,
   needsEmploymentContributionMigration,
   migrateEmploymentContributions,
   needsEndAgeMigration,
@@ -75,42 +74,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
 
-    case 'REMOVE_ASSET': {
-      const removedId = action.payload;
-
-      // Clear contributionAccountId if it references the removed asset
-      let updatedEmployment = state.income.employment;
-      let updatedSpouseEmployment = state.income.spouseEmployment;
-
-      if (updatedEmployment?.contributionAccountId === removedId) {
-        updatedEmployment = {
-          ...updatedEmployment,
-          contributionAccountId: undefined,
-          contributionType: 'traditional', // Reset to default for auto-create
-        };
-      }
-
-      if (updatedSpouseEmployment?.contributionAccountId === removedId) {
-        updatedSpouseEmployment = {
-          ...updatedSpouseEmployment,
-          contributionAccountId: undefined,
-          contributionType: 'traditional', // Reset to default for auto-create
-        };
-      }
-
+    case 'REMOVE_ASSET':
       return {
         ...state,
         assets: {
           ...state.assets,
-          accounts: state.assets.accounts.filter((asset) => asset.id !== removedId),
-        },
-        income: {
-          ...state.income,
-          employment: updatedEmployment,
-          spouseEmployment: updatedSpouseEmployment,
+          accounts: state.assets.accounts.filter((asset) => asset.id !== action.payload),
         },
       };
-    }
 
     case 'UPDATE_INCOME':
       return {
@@ -118,111 +89,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
         income: { ...state.income, ...action.payload },
       };
 
-    case 'UPDATE_EMPLOYMENT': {
-      const employment = action.payload;
-      let newAccounts = state.assets.accounts;
-      let updatedEmployment = employment;
-
-      // Auto-create account if contributionType is set but no contributionAccountId
-      if (employment && employment.annualContributions > 0 &&
-          employment.contributionType &&
-          employment.contributionType !== 'mixed' &&
-          !employment.contributionAccountId) {
-        // Check if a matching account already exists
-        const existingAccount = state.assets.accounts.find(
-          (a) => a.type === employment.contributionType &&
-                 (a.owner === 'self' || a.owner === 'joint')
-        );
-
-        if (existingAccount) {
-          // Link to existing account
-          updatedEmployment = { ...employment, contributionAccountId: existingAccount.id };
-        } else {
-          // Create new account
-          const accountType = employment.contributionType as AccountType;
-          const accountName = accountType === 'hsa'
-            ? 'HSA'
-            : `Employment ${accountType === 'roth' ? 'Roth' : 'Traditional'} 401(k)`;
-
-          const newAccount: Asset = {
-            id: generateId(),
-            name: accountName,
-            type: accountType,
-            owner: 'self',
-            balance: 0,
-            is401k: accountType !== 'hsa',
-          };
-
-          newAccounts = [...state.assets.accounts, newAccount];
-          updatedEmployment = { ...employment, contributionAccountId: newAccount.id };
-        }
-      }
-
+    case 'UPDATE_EMPLOYMENT':
       return {
         ...state,
-        assets: {
-          ...state.assets,
-          accounts: newAccounts,
-        },
         income: {
           ...state.income,
-          employment: updatedEmployment,
+          employment: action.payload,
         },
       };
-    }
 
-    case 'UPDATE_SPOUSE_EMPLOYMENT': {
-      const employment = action.payload;
-      let newAccounts = state.assets.accounts;
-      let updatedEmployment = employment;
-
-      // Auto-create account if contributionType is set but no contributionAccountId
-      if (employment && employment.annualContributions > 0 &&
-          employment.contributionType &&
-          employment.contributionType !== 'mixed' &&
-          !employment.contributionAccountId) {
-        // Check if a matching account already exists
-        const existingAccount = state.assets.accounts.find(
-          (a) => a.type === employment.contributionType &&
-                 a.owner === 'spouse'
-        );
-
-        if (existingAccount) {
-          // Link to existing account
-          updatedEmployment = { ...employment, contributionAccountId: existingAccount.id };
-        } else {
-          // Create new account
-          const accountType = employment.contributionType as AccountType;
-          const accountName = accountType === 'hsa'
-            ? "Spouse's HSA"
-            : `Spouse's ${accountType === 'roth' ? 'Roth' : 'Traditional'} 401(k)`;
-
-          const newAccount: Asset = {
-            id: generateId(),
-            name: accountName,
-            type: accountType,
-            owner: 'spouse',
-            balance: 0,
-            is401k: accountType !== 'hsa',
-          };
-
-          newAccounts = [...state.assets.accounts, newAccount];
-          updatedEmployment = { ...employment, contributionAccountId: newAccount.id };
-        }
-      }
-
+    case 'UPDATE_SPOUSE_EMPLOYMENT':
       return {
         ...state,
-        assets: {
-          ...state.assets,
-          accounts: newAccounts,
-        },
         income: {
           ...state.income,
-          spouseEmployment: updatedEmployment,
+          spouseEmployment: action.payload,
         },
       };
-    }
 
     case 'ADD_RETIREMENT_INCOME':
       return {
@@ -455,10 +338,15 @@ function migrateData(data: AppState): AppState {
     (needsEmploymentContributionMigration(migratedIncome.employment) ||
      needsEmploymentContributionMigration(migratedIncome.spouseEmployment))
   ) {
-    migratedIncome = migrateEmploymentContributions(
+    const migrationResult = migrateEmploymentContributions(
       migratedIncome,
       migratedAssets?.accounts || []
     );
+    migratedIncome = migrationResult.income;
+    migratedAssets = {
+      ...migratedAssets,
+      accounts: migrationResult.accounts,
+    };
   }
 
   return mergeWithDefaults({

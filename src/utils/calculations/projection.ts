@@ -4,7 +4,7 @@ import type {
   WhatIfAdjustments,
 } from '../../types';
 import { getStateTaxInfo } from '../../constants/stateTaxes';
-import { aggregateBalances, createAssetBalanceMap, addContributionsToAccounts, addSurplusToAccounts, growBalances, growAssetBalances } from './balances';
+import { aggregateBalances, createAssetBalanceMap, addPerAccountContributions, growBalances, growAssetBalances } from './balances';
 import { determinePhase, calculateEmploymentIncome, calculateRetirementIncomeStreams, calculateYearExpenses } from './expenses';
 import { getAdjustedSSBenefit } from './socialSecurity';
 import { withdrawFromAccounts } from './withdrawals';
@@ -118,123 +118,65 @@ export function calculateProjection(
     // Total non-employment income (SS + pension + retirement income streams)
     const totalPassiveIncome = passiveIncome + retirementIncomeStreams;
 
+    // Step 1: Add per-account contributions (date-bounded, independent of phase)
+    const contributionResult = addPerAccountContributions(assetBalanceMap, assets.accounts, year, currentYear);
+    assetBalanceMap = contributionResult.updatedMap;
+    const yearContributions = contributionResult.totalContributions;
+    if (yearContributions > 0) {
+      balances = aggregateBalances(
+        assets.accounts.map((a) => ({
+          ...a,
+          balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
+          costBasis: assetBalanceMap.get(a.id)?.costBasis ?? a.costBasis,
+        }))
+      );
+    }
+
+    // Step 2: Calculate expenses and income
+    const yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
+    const totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
+
     // Initialize year tracking variables
     let withdrawal = 0;
     let withdrawalPenalty = 0;
     let federalTax = 0;
     let stateTax = 0;
     let withdrawalSource = 'N/A';
-    let yearExpenses = 0;
-    let totalIncome = 0;
     let gap = 0;
 
-    // Check if there's any employment income this year (can span into FI phase for spouse)
-    const hasEmploymentThisYear = employmentResult.grossIncome > 0;
+    // Step 3: Determine if there's a deficit requiring withdrawals
+    // Employment income covers expenses; surplus is untracked (ignored)
+    const allIncome = employmentResult.netIncome + totalIncome;
+    const deficit = yearExpenses - allIncome;
 
-    if (hasEmploymentThisYear) {
-      // ACCUMULATING/TRANSITIONAL: Employment income present, covers expenses, contributions grow accounts
-      yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
-      totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
+    if (deficit > 0) {
+      gap = deficit;
+      const result = withdrawFromAccounts(
+        gap,
+        assets.accounts,
+        assetBalanceMap,
+        assumptions.withdrawalOrder,
+        assumptions.traditionalTaxRate,
+        assumptions.capitalGainsTaxRate,
+        stateTaxInfo,
+        age,
+        spouseAge,
+        penaltySettings
+      );
+      withdrawal = result.amount;
+      withdrawalPenalty = result.penalty;
+      federalTax = result.federalTax;
+      stateTax = result.stateTax;
+      withdrawalSource = result.source;
+      balances = result.balances;
+      assetBalanceMap = result.assetBalances;
+    }
 
-      // Add contributions to retirement accounts BEFORE calculating surplus
-      if (employmentResult.contributions > 0) {
-        assetBalanceMap = addContributionsToAccounts(
-          assetBalanceMap,
-          assets.accounts,
-          employmentResult.selfContributions,
-          employmentResult.spouseContributions,
-          income.employment,
-          income.spouseEmployment
-        );
-        // Update aggregated balances
-        balances = aggregateBalances(
-          assets.accounts.map((a) => ({
-            ...a,
-            balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
-          }))
-        );
-      }
-
-      // Calculate surplus (net employment income + passive income - expenses)
-      const surplus = employmentResult.netIncome + totalIncome - yearExpenses;
-
-      if (surplus > 0) {
-        // Positive surplus: add to taxable account
-        assetBalanceMap = addSurplusToAccounts(assetBalanceMap, assets.accounts, surplus);
-        balances = aggregateBalances(
-          assets.accounts.map((a) => ({
-            ...a,
-            balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
-            costBasis: assetBalanceMap.get(a.id)?.costBasis ?? a.costBasis,
-          }))
-        );
-        withdrawalSource = 'Savings';
-      } else if (surplus < 0) {
-        // Negative surplus: need to withdraw from accounts
-        gap = Math.abs(surplus);
-        const result = withdrawFromAccounts(
-          gap,
-          assets.accounts,
-          assetBalanceMap,
-          assumptions.withdrawalOrder,
-          assumptions.traditionalTaxRate,
-          assumptions.capitalGainsTaxRate,
-          stateTaxInfo,
-          age,
-          spouseAge,
-          penaltySettings
-        );
-        withdrawal = result.amount;
-        withdrawalPenalty = result.penalty;
-        federalTax = result.federalTax;
-        stateTax = result.stateTax;
-        withdrawalSource = result.source;
-        balances = result.balances;
-        assetBalanceMap = result.assetBalances;
-      }
-
-      // Update withdrawal source if mortgage payoff occurred
-      if (mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A' && withdrawalSource !== 'Savings') {
-        withdrawalSource = `${withdrawalSource} (+ Mortgage Payoff)`;
-      } else if (mortgagePayoffExpense > 0 && withdrawalSource === 'N/A') {
-        withdrawalSource = 'Mortgage Payoff';
-      }
-    } else {
-      // FI PHASE (no employment): Rely on passive income and withdrawals
-      yearExpenses = expenseResult.totalExpenses + Math.max(0, lifeEventTotal) + mortgagePayoffExpense;
-      totalIncome = totalPassiveIncome + Math.abs(Math.min(0, lifeEventTotal));
-
-      // Gap is what needs to come from portfolio
-      gap = Math.max(0, yearExpenses - totalIncome);
-
-      if (gap > 0) {
-        const result = withdrawFromAccounts(
-          gap,
-          assets.accounts,
-          assetBalanceMap,
-          assumptions.withdrawalOrder,
-          assumptions.traditionalTaxRate,
-          assumptions.capitalGainsTaxRate,
-          stateTaxInfo,
-          age,
-          spouseAge,
-          penaltySettings
-        );
-        withdrawal = result.amount;
-        withdrawalPenalty = result.penalty;
-        federalTax = result.federalTax;
-        stateTax = result.stateTax;
-        withdrawalSource = result.source;
-        balances = result.balances;
-        assetBalanceMap = result.assetBalances;
-      }
-
-      // Update withdrawal source if mortgage payoff occurred
-      if (mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A') {
-        withdrawalSource = `${withdrawalSource} (+ Mortgage Payoff)`;
-      } else if (mortgagePayoffExpense > 0) {
-        withdrawalSource = 'Mortgage Payoff';
-      }
+    // Update withdrawal source if mortgage payoff occurred
+    if (mortgagePayoffExpense > 0 && withdrawalSource !== 'N/A') {
+      withdrawalSource = `${withdrawalSource} (+ Mortgage Payoff)`;
+    } else if (mortgagePayoffExpense > 0) {
+      withdrawalSource = 'Mortgage Payoff';
     }
 
     // Check for shortfall
@@ -251,7 +193,7 @@ export function calculateProjection(
       expenses: yearExpenses,
       income: totalIncome,
       employmentIncome: employmentResult.netIncome,
-      contributions: employmentResult.contributions,
+      contributions: yearContributions,
       retirementIncome: retirementIncomeStreams,
       gap,
       withdrawal,

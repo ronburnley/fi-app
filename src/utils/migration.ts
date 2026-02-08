@@ -13,6 +13,14 @@ import type {
   EmploymentIncome,
 } from '../types';
 
+// Legacy employment format (had contribution fields and endAge)
+interface LegacyEmploymentIncome extends EmploymentIncome {
+  annualContributions?: number;
+  contributionAccountId?: string;
+  contributionType?: string;
+  endAge?: number;
+}
+
 // Generate a simple UUID
 function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -231,11 +239,6 @@ export function migrateHomeExpense(home: HomeExpense & { mortgage?: LegacyMortga
   };
 }
 
-// Legacy employment format (had endAge)
-interface LegacyEmploymentIncome extends EmploymentIncome {
-  endAge?: number;
-}
-
 // Check if employment income has legacy endAge field that needs stripping
 export function needsEndAgeMigration(income: Income | undefined): boolean {
   if (!income) return false;
@@ -277,14 +280,14 @@ export function migrateEndAge(income: Income): Income {
   };
 }
 
-// Check if employment income needs contribution linking
+// Check if employment data has legacy contribution fields that need migrating to per-account
 export function needsEmploymentContributionMigration(employment: EmploymentIncome | undefined): boolean {
   if (!employment) return false;
-  // Needs migration if has contributions but no link and no type set
+  const legacy = employment as LegacyEmploymentIncome;
   return (
-    employment.annualContributions > 0 &&
-    !employment.contributionAccountId &&
-    !employment.contributionType
+    'annualContributions' in legacy ||
+    'contributionAccountId' in legacy ||
+    'contributionType' in legacy
   );
 }
 
@@ -292,79 +295,92 @@ export function needsEmploymentContributionMigration(employment: EmploymentIncom
 function findBestContributionAccount(
   accounts: Asset[],
   owner: AccountOwner
-): string | undefined {
-  // Filter accounts by owner
+): Asset | undefined {
   const ownerAccounts = accounts.filter(
     (a) => a.owner === owner || a.owner === 'joint'
   );
 
   // Priority: traditional 401k > traditional IRA > roth 401k > roth IRA > any retirement
-  const traditional401k = ownerAccounts.find(
-    (a) => a.type === 'traditional' && a.is401k
+  return (
+    ownerAccounts.find((a) => a.type === 'traditional' && a.is401k) ||
+    ownerAccounts.find((a) => a.type === 'traditional') ||
+    ownerAccounts.find((a) => a.type === 'roth' && a.is401k) ||
+    ownerAccounts.find((a) => a.type === 'roth') ||
+    ownerAccounts.find((a) => a.type === 'hsa')
   );
-  if (traditional401k) return traditional401k.id;
-
-  const traditional = ownerAccounts.find((a) => a.type === 'traditional');
-  if (traditional) return traditional.id;
-
-  const roth401k = ownerAccounts.find((a) => a.type === 'roth' && a.is401k);
-  if (roth401k) return roth401k.id;
-
-  const roth = ownerAccounts.find((a) => a.type === 'roth');
-  if (roth) return roth.id;
-
-  const hsa = ownerAccounts.find((a) => a.type === 'hsa');
-  if (hsa) return hsa.id;
-
-  return undefined;
 }
 
-// Migrate employment income to link contributions to accounts
+/**
+ * Migrate legacy contribution fields from employment to per-account contributions.
+ * - If contributionAccountId points to a valid account, set that account's annualContribution
+ * - If contributionType is a single type, find first matching account by type/owner
+ * - If 'mixed', contribution is lost (user must re-enter on individual accounts)
+ * - Strip legacy fields from employment
+ */
 export function migrateEmploymentContributions(
   income: Income,
   accounts: Asset[]
-): Income {
-  let updatedEmployment = income.employment;
-  let updatedSpouseEmployment = income.spouseEmployment;
+): { income: Income; accounts: Asset[] } {
+  let updatedAccounts = [...accounts];
 
-  // Migrate self employment
-  if (needsEmploymentContributionMigration(income.employment)) {
-    const bestAccount = findBestContributionAccount(accounts, 'self');
-    if (bestAccount) {
-      updatedEmployment = {
-        ...income.employment!,
-        contributionAccountId: bestAccount,
-      };
-    } else {
-      // No matching account found, set type for auto-creation
-      updatedEmployment = {
-        ...income.employment!,
-        contributionType: 'traditional',
-      };
-    }
-  }
+  // Helper to migrate one employment record's contributions to an account
+  const migrateOne = (
+    employment: EmploymentIncome | undefined,
+    owner: AccountOwner
+  ): EmploymentIncome | undefined => {
+    if (!employment) return employment;
+    const legacy = employment as LegacyEmploymentIncome;
 
-  // Migrate spouse employment
-  if (needsEmploymentContributionMigration(income.spouseEmployment)) {
-    const bestAccount = findBestContributionAccount(accounts, 'spouse');
-    if (bestAccount) {
-      updatedSpouseEmployment = {
-        ...income.spouseEmployment!,
-        contributionAccountId: bestAccount,
-      };
-    } else {
-      // No matching account found, set type for auto-creation
-      updatedSpouseEmployment = {
-        ...income.spouseEmployment!,
-        contributionType: 'traditional',
-      };
+    const amount = legacy.annualContributions ?? 0;
+
+    if (amount > 0) {
+      let targetAccount: Asset | undefined;
+
+      // Try linked account first
+      if (legacy.contributionAccountId) {
+        targetAccount = updatedAccounts.find((a) => a.id === legacy.contributionAccountId);
+      }
+
+      // Try matching by type (skip 'mixed' — cannot auto-migrate)
+      if (!targetAccount && legacy.contributionType && legacy.contributionType !== 'mixed') {
+        const ownerAccounts = updatedAccounts.filter(
+          (a) => a.owner === owner || a.owner === 'joint'
+        );
+        targetAccount = ownerAccounts.find((a) => a.type === legacy.contributionType);
+      }
+
+      // Fallback: find best matching account
+      if (!targetAccount) {
+        targetAccount = findBestContributionAccount(updatedAccounts, owner);
+      }
+
+      // Set contribution on the target account (if found and not already set)
+      if (targetAccount && !targetAccount.annualContribution) {
+        updatedAccounts = updatedAccounts.map((a) =>
+          a.id === targetAccount!.id
+            ? { ...a, annualContribution: amount }
+            : a
+        );
+      }
     }
-  }
+
+    // Strip legacy fields, keep only annualGrossIncome and effectiveTaxRate
+    return {
+      annualGrossIncome: legacy.annualGrossIncome,
+      effectiveTaxRate: legacy.effectiveTaxRate,
+    };
+  };
+
+  const updatedEmployment = migrateOne(income.employment, 'self');
+  const updatedSpouseEmployment = migrateOne(income.spouseEmployment, 'spouse');
 
   return {
-    ...income,
-    employment: updatedEmployment,
-    spouseEmployment: updatedSpouseEmployment,
+    income: {
+      ...income,
+      employment: updatedEmployment,
+      spouseEmployment: updatedSpouseEmployment,
+    },
+    accounts: updatedAccounts,
   };
 }
 

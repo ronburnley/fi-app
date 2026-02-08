@@ -152,10 +152,17 @@ export function AssetsStep() {
                   </span>
                 </div>
 
-                {/* Balance */}
-                <span className="text-sm font-medium text-text-primary tabular-nums flex-shrink-0">
-                  {formatCurrencyCompact(asset.balance)}
-                </span>
+                {/* Contribution + Balance */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {asset.annualContribution && asset.annualContribution > 0 && (
+                    <span className="text-xs font-medium text-emerald-400/80 tabular-nums">
+                      +{formatCurrencyCompact(asset.annualContribution)}/yr
+                    </span>
+                  )}
+                  <span className="text-sm font-medium text-text-primary tabular-nums">
+                    {formatCurrencyCompact(asset.balance)}
+                  </span>
+                </div>
               </button>
             ))
           )}
