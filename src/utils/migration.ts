@@ -4,6 +4,7 @@ import type {
   LegacyAssets,
   AccountType,
   AccountOwner,
+  Expense,
   Expenses,
   LegacyExpenses,
   MortgageDetails,
@@ -154,7 +155,7 @@ export function isLegacyExpenseFormat(expenses: unknown): expenses is LegacyExpe
 }
 
 // Migrate legacy single-value expense format to new category-based format
-export function migrateLegacyExpenses(legacy: LegacyExpenses, inflationRate: number = 0.03): Expenses {
+export function migrateLegacyExpenses(legacy: LegacyExpenses): Expenses {
   // Convert single annual spending to a single "General Living" expense
   // User can then break this down into categories
   return {
@@ -163,7 +164,6 @@ export function migrateLegacyExpenses(legacy: LegacyExpenses, inflationRate: num
         id: generateId(),
         name: 'General Living Expenses',
         annualAmount: legacy.annualSpending,
-        inflationRate: inflationRate,
         category: 'living',
       },
     ],
@@ -381,6 +381,51 @@ export function migrateEmploymentContributions(
       spouseEmployment: updatedSpouseEmployment,
     },
     accounts: updatedAccounts,
+  };
+}
+
+// Check if expenses have legacy numeric inflationRate field
+export function needsInflationMigration(expenses: Expenses | undefined): boolean {
+  if (!expenses) return false;
+
+  // Check regular expenses for numeric inflationRate
+  for (const expense of expenses.categories) {
+    if ('inflationRate' in expense) return true;
+  }
+
+  // Check home expense for inflationRate
+  if (expenses.home && 'inflationRate' in expenses.home) return true;
+
+  return false;
+}
+
+// Migrate legacy numeric inflationRate to boolean inflationAdjusted
+export function migrateInflation(expenses: Expenses): Expenses {
+  // Migrate regular expenses
+  const migratedCategories: Expense[] = expenses.categories.map((expense) => {
+    const legacy = expense as Expense & { inflationRate?: number };
+    if ('inflationRate' in legacy) {
+      const { inflationRate, ...rest } = legacy;
+      // inflationRate === 0 means fixed cost
+      if (inflationRate === 0) {
+        return { ...rest, inflationAdjusted: false };
+      }
+      // Any non-zero rate → use global rate (default behavior, omit field)
+      return rest as Expense;
+    }
+    return expense;
+  });
+
+  // Strip inflationRate from home expense
+  let migratedHome = expenses.home;
+  if (migratedHome && 'inflationRate' in migratedHome) {
+    const { inflationRate: _, ...rest } = migratedHome as HomeExpense & { inflationRate?: number };
+    migratedHome = rest as HomeExpense;
+  }
+
+  return {
+    categories: migratedCategories,
+    home: migratedHome,
   };
 }
 

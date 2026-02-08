@@ -21,10 +21,6 @@ function formatCurrencyCompact(n: number): string {
   });
 }
 
-function formatPercent(n: number): string {
-  return `${(n * 100).toFixed(1)}%`;
-}
-
 const LOAN_TERM_OPTIONS = [
   { value: '15', label: '15 years' },
   { value: '20', label: '20 years' },
@@ -130,7 +126,6 @@ export function SpendingStep() {
         payload: {
           propertyTax: 0,
           insurance: 0,
-          inflationRate: 0.03,
         },
       });
     } else {
@@ -230,7 +225,7 @@ export function SpendingStep() {
           Your Expenses
         </h1>
         <p className="text-text-secondary">
-          Break down your spending into categories. Each expense can have its own timeline and inflation rate.
+          Break down your spending into categories. Each expense can have its own timeline.
         </p>
       </div>
 
@@ -346,13 +341,11 @@ export function SpendingStep() {
                       ) : (
                         <span>Ongoing</span>
                       )}
-                      {/* Inflation indicator */}
-                      {expense.inflationRate !== 0.03 && (
+                      {/* Fixed cost indicator */}
+                      {expense.inflationAdjusted === false && (
                         <>
                           <span className="text-border-default">·</span>
-                          <span className={expense.inflationRate > 0.03 ? 'text-accent-warning' : ''}>
-                            {formatPercent(expense.inflationRate)} infl.
-                          </span>
+                          <span className="text-text-muted">Fixed</span>
                         </>
                       )}
                     </div>
@@ -596,17 +589,6 @@ export function SpendingStep() {
                 )}
               </div>
 
-              {/* Tax/Insurance Inflation */}
-              <div className="pt-3 border-t border-border-subtle/50 max-w-[200px]">
-                <PercentInput
-                  label="Tax/Insurance Inflation"
-                  value={expenses.home.inflationRate}
-                  onChange={(value) => updateHomeExpense({ inflationRate: value })}
-                  hint="Annual increase for property tax & insurance"
-                  min={0}
-                  max={15}
-                />
-              </div>
             </div>
           )}
         </div>

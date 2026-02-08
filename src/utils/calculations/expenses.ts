@@ -133,8 +133,11 @@ export function calculateYearExpenses(
     // Skip if outside active years
     if (year < startYear || year > endYear) continue;
 
-    // Calculate inflation-adjusted amount from current year
-    const inflatedAmount = expense.annualAmount * Math.pow(1 + expense.inflationRate, yearsFromNow);
+    // Calculate inflation-adjusted amount from current year (skip if fixed cost)
+    const shouldInflate = expense.inflationAdjusted !== false;
+    const inflatedAmount = shouldInflate
+      ? expense.annualAmount * Math.pow(1 + globalInflationRate, yearsFromNow)
+      : expense.annualAmount;
 
     totalExpenses += inflatedAmount;
   }
@@ -142,7 +145,6 @@ export function calculateYearExpenses(
   // Process home expenses separately
   if (expenses.home) {
     const home = expenses.home;
-    const homeInflationRate = home.inflationRate ?? globalInflationRate;
 
     // Mortgage handling with new MortgageDetails structure
     if (home.mortgage) {
@@ -173,13 +175,13 @@ export function calculateYearExpenses(
 
     // Property Tax (inflates from current year)
     if (home.propertyTax > 0) {
-      const inflatedTax = home.propertyTax * Math.pow(1 + homeInflationRate, yearsFromNow);
+      const inflatedTax = home.propertyTax * Math.pow(1 + globalInflationRate, yearsFromNow);
       totalExpenses += inflatedTax;
     }
 
     // Insurance (inflates from current year)
     if (home.insurance > 0) {
-      const inflatedInsurance = home.insurance * Math.pow(1 + homeInflationRate, yearsFromNow);
+      const inflatedInsurance = home.insurance * Math.pow(1 + globalInflationRate, yearsFromNow);
       totalExpenses += inflatedInsurance;
     }
   }

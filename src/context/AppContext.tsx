@@ -16,6 +16,8 @@ import {
   migrateEmploymentContributions,
   needsEndAgeMigration,
   migrateEndAge,
+  needsInflationMigration,
+  migrateInflation,
 } from '../utils/migration';
 import { calculateAchievableFIAge } from '../utils/calculations';
 import { useAuth } from './AuthContext';
@@ -312,10 +314,7 @@ function migrateData(data: AppState): AppState {
 
   let migratedExpenses = data.expenses;
   if (isLegacyExpenseFormat(data.expenses)) {
-    migratedExpenses = migrateLegacyExpenses(
-      data.expenses,
-      data.assumptions?.inflationRate ?? 0.03
-    );
+    migratedExpenses = migrateLegacyExpenses(data.expenses);
   }
 
   if (migratedExpenses?.home && needsMortgageMigration(migratedExpenses.home)) {
@@ -323,6 +322,11 @@ function migrateData(data: AppState): AppState {
       ...migratedExpenses,
       home: migrateHomeExpense(migratedExpenses.home),
     };
+  }
+
+  // Migrate per-expense inflationRate to global inflationAdjusted boolean
+  if (needsInflationMigration(migratedExpenses)) {
+    migratedExpenses = migrateInflation(migratedExpenses);
   }
 
   // Migrate employment contribution linking

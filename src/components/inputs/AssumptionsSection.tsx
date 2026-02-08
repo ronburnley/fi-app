@@ -43,7 +43,7 @@ export function AssumptionsSection() {
               label="General Inflation"
               value={assumptions.inflationRate}
               onChange={(value) => updateAssumptions('inflationRate', value)}
-              hint="For retirement income & home cost default"
+              hint="Applied to all expenses & retirement income"
               min={0}
               max={15}
             />

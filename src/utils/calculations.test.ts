@@ -78,7 +78,6 @@ function createTestState(overrides: Partial<AppState> = {}): AppState {
           id: 'exp-1',
           name: 'Living Expenses',
           annualAmount: 80000,
-          inflationRate: 0.03,
           category: 'living',
         },
       ],
@@ -284,7 +283,7 @@ describe('Employment Income Calculations', () => {
         retirementIncomes: [],
       },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 80000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 80000, inflationAdjusted: false, category: 'living' }],
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
     });
@@ -384,7 +383,7 @@ describe('Social Security COLA', () => {
         colaRate: 0.02,
       },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -415,7 +414,7 @@ describe('Social Security COLA', () => {
         },
       },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -473,7 +472,7 @@ describe('Social Security FRA Adjustment', () => {
           colaRate: 0,
         },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationAdjusted: false, category: 'living' }],
         },
       });
 
@@ -493,7 +492,7 @@ describe('Social Security FRA Adjustment', () => {
           colaRate: 0,
         },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, inflationAdjusted: false, category: 'living' }],
         },
       });
 
@@ -513,7 +512,7 @@ describe('Social Security FRA Adjustment', () => {
           colaRate: 0.02,
         },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationAdjusted: false, category: 'living' }],
         },
       });
 
@@ -536,7 +535,7 @@ describe('Social Security FRA Adjustment', () => {
           colaRate: 0,
         },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationAdjusted: false, category: 'living' }],
         },
       });
 
@@ -562,7 +561,7 @@ describe('Social Security FRA Adjustment', () => {
           },
         },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
         },
       });
 
@@ -593,7 +592,7 @@ describe('Pension COLA', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -624,7 +623,7 @@ describe('Withdrawal Penalties', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -653,7 +652,7 @@ describe('Withdrawal Penalties', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -692,7 +691,7 @@ describe('Per-Account Contributions', () => {
         retirementIncomes: [],
       },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
     });
@@ -723,7 +722,7 @@ describe('Per-Account Contributions', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, inflationAdjusted: false, category: 'living' }],
       },
       assumptions: {
         investmentReturn: 0, inflationRate: 0,
@@ -764,7 +763,7 @@ describe('Per-Account Contributions', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -796,7 +795,7 @@ describe('Surplus Handling', () => {
         retirementIncomes: [],
       },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
       },
     });
 
@@ -823,7 +822,7 @@ describe('Achievable FI Age', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, category: 'living' }],
       },
     });
 
@@ -843,7 +842,7 @@ describe('Achievable FI Age', () => {
         ],
       },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, category: 'living' }],
       },
     });
 
@@ -864,7 +863,7 @@ describe('Achievable FI Age', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 100000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 100000, category: 'living' }],
       },
     });
 
@@ -884,7 +883,7 @@ describe('Achievable FI Age', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 100000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 100000, category: 'living' }],
       },
     });
 
@@ -907,7 +906,7 @@ describe('Achievable FI Age', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, category: 'living' }],
       },
     });
 
@@ -928,7 +927,7 @@ describe('Achievable FI Age', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, category: 'living' }],
       },
     });
 
@@ -955,7 +954,7 @@ describe('Expense Inflation', () => {
       },
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, category: 'living' }],
       },
     });
 
@@ -968,7 +967,7 @@ describe('Expense Inflation', () => {
     expect(projections[5].expenses).toBeCloseTo(57964, 0);
   });
 
-  it('respects per-expense inflation rates', () => {
+  it('respects inflationAdjusted flag (fixed vs inflating)', () => {
     const state = createTestState({
       profile: { currentAge: 45, targetFIAge: 45, lifeExpectancy: 50, state: 'TX', filingStatus: 'single' },
       assets: {
@@ -979,8 +978,8 @@ describe('Expense Inflation', () => {
       socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
       expenses: {
         categories: [
-          { id: 'exp-1', name: 'Healthcare', annualAmount: 10000, inflationRate: 0.05, category: 'healthcare' },
-          { id: 'exp-2', name: 'Living', annualAmount: 40000, inflationRate: 0.02, category: 'living' },
+          { id: 'exp-1', name: 'Fixed Cost', annualAmount: 10000, inflationAdjusted: false, category: 'other' },
+          { id: 'exp-2', name: 'Living', annualAmount: 40000, category: 'living' },
         ],
       },
     });
@@ -988,10 +987,10 @@ describe('Expense Inflation', () => {
     const projections = calculateProjection(state);
 
     // Year 5:
-    // Healthcare: 10000 * 1.05^5 = 12763
-    // Living: 40000 * 1.02^5 = 44163
-    // Total: 56926
-    expect(projections[5].expenses).toBeCloseTo(56926, 0);
+    // Fixed: 10000 (no inflation)
+    // Living: 40000 * 1.03^5 = 46371
+    // Total: 56371
+    expect(projections[5].expenses).toBeCloseTo(56371, 0);
   });
 });
 
@@ -1001,7 +1000,7 @@ describe('Summary Calculations', () => {
   it('calculates FI number correctly', () => {
     const state = createTestState({
       expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 80000, inflationRate: 0.03, category: 'living' }],
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 80000, category: 'living' }],
       },
       assumptions: {
         investmentReturn: 0.06,

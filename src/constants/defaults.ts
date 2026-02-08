@@ -24,15 +24,13 @@ function createDefaultExpense(
   name: string,
   category: ExpenseCategory,
   annualAmount: number,
-  inflationRate: number = 0.03,
-  options?: Partial<Omit<Expense, 'id' | 'name' | 'category' | 'annualAmount' | 'inflationRate'>>
+  options?: Partial<Omit<Expense, 'id' | 'name' | 'category' | 'annualAmount'>>
 ): Expense {
   return {
     id: generateId(),
     name,
     category,
     annualAmount,
-    inflationRate,
     ...options,
   };
 }
@@ -104,10 +102,10 @@ export const DEFAULT_STATE: AppState = {
     categories: [
       createDefaultExpense('Groceries & Household', 'living', 12000),
       createDefaultExpense('Utilities', 'living', 4800),
-      createDefaultExpense('Transportation', 'living', 6000, 0.025),
-      createDefaultExpense('Health Insurance', 'healthcare', 12000, 0.05),
-      createDefaultExpense('Medical Expenses', 'healthcare', 3000, 0.05),
-      createDefaultExpense('Travel & Entertainment', 'discretionary', 10000, 0.025),
+      createDefaultExpense('Transportation', 'living', 6000),
+      createDefaultExpense('Health Insurance', 'healthcare', 12000),
+      createDefaultExpense('Medical Expenses', 'healthcare', 3000),
+      createDefaultExpense('Travel & Entertainment', 'discretionary', 10000),
       createDefaultExpense('Dining Out', 'discretionary', 6000),
     ],
     home: {
@@ -123,7 +121,6 @@ export const DEFAULT_STATE: AppState = {
       },
       propertyTax: 8000,
       insurance: 2400,
-      inflationRate: 0.03,
     },
   },
   lifeEvents: [],

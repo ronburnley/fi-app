@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Expense, ExpenseCategory } from '../../types';
-import { Input, CurrencyInput, PercentInput, Button, Select } from '../ui';
+import { Input, CurrencyInput, Button, Select } from '../ui';
 import { EXPENSE_CATEGORY_LABELS } from '../../constants/defaults';
 
 interface ExpenseEditFormProps {
@@ -16,7 +16,7 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
   const [name, setName] = useState(expense?.name ?? '');
   const [annualAmount, setAnnualAmount] = useState(expense?.annualAmount ?? 0);
   const [category, setCategory] = useState<ExpenseCategory>(expense?.category ?? 'living');
-  const [inflationRate, setInflationRate] = useState(expense?.inflationRate ?? 0.03);
+  const [isFixedCost, setIsFixedCost] = useState(expense?.inflationAdjusted === false);
   const [hasStartYear, setHasStartYear] = useState(!!expense?.startYear);
   const [startYear, setStartYear] = useState(expense?.startYear ?? currentYear + 1);
   const [hasEndYear, setHasEndYear] = useState(!!expense?.endYear);
@@ -31,7 +31,7 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
       name: name.trim(),
       annualAmount,
       category,
-      inflationRate,
+      inflationAdjusted: isFixedCost ? false : undefined,
       startYear: hasStartYear ? startYear : undefined,
       endYear: hasEndYear ? endYear : undefined,
     });
@@ -132,16 +132,20 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
             )}
           </div>
 
-          {/* Inflation rate */}
-          <div className="pt-3 border-t border-border-subtle/50 max-w-[200px]">
-            <PercentInput
-              label="Inflation Rate"
-              value={inflationRate}
-              onChange={setInflationRate}
-              hint="Default is 3%"
-              min={0}
-              max={15}
-            />
+          {/* Fixed cost toggle */}
+          <div className="pt-3 border-t border-border-subtle/50">
+            <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isFixedCost}
+                onChange={(e) => setIsFixedCost(e.target.checked)}
+                className="rounded border-border-default bg-bg-tertiary text-accent-blue focus:ring-accent-blue"
+              />
+              Fixed cost (no inflation)
+            </label>
+            <p className="text-xs text-text-muted mt-1 ml-6">
+              Check for costs that won't increase over time
+            </p>
           </div>
 
           {/* Actions */}

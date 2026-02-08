@@ -73,7 +73,6 @@ function createTestState(overrides: Partial<AppState> = {}): AppState {
           id: 'exp-1',
           name: 'Living Expenses',
           annualAmount: 80000,
-          inflationRate: 0.03,
           category: 'living',
         },
       ],
@@ -122,7 +121,7 @@ describe('Integration Tests', () => {
         income: { retirementIncomes: [] },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -189,7 +188,7 @@ describe('Integration Tests', () => {
         income: { retirementIncomes: [] },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -243,7 +242,7 @@ describe('Integration Tests', () => {
         },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -321,7 +320,7 @@ describe('Integration Tests', () => {
         },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -377,7 +376,7 @@ describe('Integration Tests', () => {
         income: { retirementIncomes: [] },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -414,7 +413,7 @@ describe('Integration Tests', () => {
         income: { retirementIncomes: [] },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -472,7 +471,7 @@ describe('Integration Tests', () => {
         income: { retirementIncomes: [] },
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
-          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' }],
+          categories: [{ id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' }],
         },
         assumptions: {
           investmentReturn: 0,
@@ -519,7 +518,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 30000, inflationRate: 0, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 30000, inflationAdjusted: false, category: 'living' },
           ],
           home: {
             mortgage: {
@@ -534,7 +533,6 @@ describe('Integration Tests', () => {
             },
             propertyTax: 0,
             insurance: 0,
-            inflationRate: 0,
           },
         },
         assumptions: {
@@ -597,7 +595,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' },
           ],
         },
         lifeEvents: [
@@ -646,7 +644,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 40000, inflationRate: 0, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 40000, inflationAdjusted: false, category: 'living' },
           ],
         },
         lifeEvents: [
@@ -708,7 +706,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67, colaRate: 0.02 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 70000, inflationRate: 0.03, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 70000, category: 'living' },
           ],
         },
       });
@@ -744,7 +742,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67, colaRate: 0.02 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 70000, inflationRate: 0.03, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 70000, category: 'living' },
           ],
         },
       });
@@ -780,7 +778,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67, colaRate: 0.02 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 70000, inflationRate: 0.03, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 70000, category: 'living' },
           ],
         },
       });
@@ -853,7 +851,7 @@ describe('Integration Tests', () => {
         },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 80000, inflationRate: 0.03, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 80000, category: 'living' },
           ],
         },
         assumptions: {
@@ -939,7 +937,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 80000, inflationRate: 0.03, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 80000, category: 'living' },
           ],
         },
         assumptions: {
@@ -987,7 +985,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 50000, inflationRate: 0, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' },
           ],
         },
         assumptions: {
@@ -1045,7 +1043,7 @@ describe('Integration Tests', () => {
         socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
         expenses: {
           categories: [
-            { id: 'exp-1', name: 'Living', annualAmount: 60000, inflationRate: 0, category: 'living' },
+            { id: 'exp-1', name: 'Living', annualAmount: 60000, inflationAdjusted: false, category: 'living' },
           ],
         },
         assumptions: {

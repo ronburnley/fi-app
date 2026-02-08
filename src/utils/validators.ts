@@ -70,9 +70,6 @@ export function validateExpenses(expenses: Expenses): ValidationError[] {
     if (expense.annualAmount > 10000000) {
       errors.push({ field: `expense.${expense.id}.annualAmount`, message: `${expense.name} amount seems unrealistically high` });
     }
-    if (expense.inflationRate < 0 || expense.inflationRate > 0.2) {
-      errors.push({ field: `expense.${expense.id}.inflationRate`, message: `${expense.name} inflation rate should be between 0% and 20%` });
-    }
     if (expense.startYear && expense.endYear && expense.startYear > expense.endYear) {
       errors.push({ field: `expense.${expense.id}.endYear`, message: `${expense.name} end year must be after start year` });
     }
@@ -106,9 +103,6 @@ export function validateExpenses(expenses: Expenses): ValidationError[] {
     }
     if (expenses.home.insurance < 0) {
       errors.push({ field: 'home.insurance', message: 'Home insurance cannot be negative' });
-    }
-    if (expenses.home.inflationRate < 0 || expenses.home.inflationRate > 0.2) {
-      errors.push({ field: 'home.inflationRate', message: 'Home expense inflation rate should be between 0% and 20%' });
     }
   }
 

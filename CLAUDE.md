@@ -63,7 +63,7 @@ For each year from `currentAge` to `lifeExpectancy`:
 1. **Determine phase** — accumulating or FI based on age vs FI age
 2. **Add per-account contributions** — each account with `annualContribution` gets funded if year is within [startYear, endYear]. Contributions are phase-independent (date-bounded, not tied to employment).
 3. **Calculate employment income** — gross - tax (net income). Surplus (income > expenses) is ignored.
-4. **Calculate expenses** — inflation-adjusted base + per-item expenses + life events
+4. **Calculate expenses** — global-inflation-adjusted (unless `inflationAdjusted: false`) + life events
 5. **Calculate passive income** — Social Security (FRA-adjusted + COLA), pension (+ COLA), retirement income streams
 6. **Calculate gap** — expenses minus all income
 7. **If gap > 0:** Withdraw from accounts in priority order (penalty-free first within each type)
@@ -140,6 +140,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v7.1 | 2026-02-08 | **Simplified Inflation** — Single global inflation rate for all expenses. Replaced per-expense `inflationRate: number` with `inflationAdjusted?: boolean` (default true, false = fixed cost). Removed `HomeExpense.inflationRate`. UI: checkbox toggle replaces PercentInput, "Fixed" badge on expense rows. Migration converts legacy data. 63 tests. |
 | v7.0 | 2026-02-08 | **Per-Account Contributions** — Moved contributions from employment to individual accounts (`annualContribution` + start/end year). Removed surplus auto-deposit. Simplified `EmploymentIncome` to gross + tax rate. 63 tests (47 unit + 16 integration). |
 | v6.1 | 2026-02-07 | **Engine Refactor** — Split 1545-line `calculations.ts` into 10 focused modules under `calculations/`. Added 16 integration tests (62 total). Zero logic changes. |
 | v6.0 | 2026-02-07 | **FI Age Model Rework** — Removed retirement age (`endAge`). FI age IS when employment stops. Two phases (accumulating/fi), no gap. Spouse additional work years. Shortfall guidance. |

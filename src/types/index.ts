@@ -87,7 +87,7 @@ export interface Expense {
   annualAmount: number;
   startYear?: number;      // undefined = current year
   endYear?: number;        // undefined = perpetual (through life expectancy)
-  inflationRate: number;   // per-expense inflation (decimal, e.g., 0.03 = 3%)
+  inflationAdjusted?: boolean;  // default true; false = fixed cost (no inflation)
   category: ExpenseCategory;
 }
 
@@ -120,7 +120,6 @@ export interface HomeExpense {
   mortgage?: MortgageDetails;
   propertyTax: number;         // Annual amount
   insurance: number;           // Annual homeowners insurance
-  inflationRate: number;       // For taxes/insurance only (default 0.03)
 }
 
 export interface Expenses {
