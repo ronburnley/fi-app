@@ -182,11 +182,15 @@ export function withdrawFromAccounts(
       let stateTaxOnWithdrawal = 0;
 
       if (sourceType === 'roth') {
-        grossWithdrawal = remaining;
-        // No tax on Roth withdrawals
+        // No tax on Roth, but early withdrawal penalty must be grossed up
+        const penaltyRate = isPenaltyFree(asset, selfAge, spouseAge, penaltySettings)
+          ? 0 : penaltySettings.earlyWithdrawalPenaltyRate;
+        grossWithdrawal = remaining / (1 - penaltyRate);
       } else if (sourceType === 'traditional') {
         const combinedTaxRate = traditionalTaxRate + stateTaxInfo.incomeRate;
-        grossWithdrawal = remaining / (1 - combinedTaxRate);
+        const penaltyRate = isPenaltyFree(asset, selfAge, spouseAge, penaltySettings)
+          ? 0 : penaltySettings.earlyWithdrawalPenaltyRate;
+        grossWithdrawal = remaining / (1 - combinedTaxRate - penaltyRate);
       } else {
         // Taxable: approximate - gains are only part of withdrawal
         const costBasisRatio = balanceInfo.costBasis !== undefined && available > 0
@@ -276,7 +280,9 @@ export function withdrawFromAccounts(
 
     const balanceInfo = newAssetBalanceMap.get(asset.id)!;
     const available = balanceInfo.balance;
-    const fromHSA = Math.min(remaining, available);
+    const hsaPenaltyRate = isPenaltyFree(asset, selfAge, spouseAge, penaltySettings)
+      ? 0 : penaltySettings.hsaEarlyPenaltyRate;
+    const fromHSA = Math.min(remaining / (1 - hsaPenaltyRate), available);
 
     // Calculate HSA penalty if under 65
     const penalty = calculatePenalty(

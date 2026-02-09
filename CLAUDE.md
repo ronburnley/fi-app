@@ -140,6 +140,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v7.2 | 2026-02-09 | **Penalty Gross-Up Fix** — Withdrawal gross-up now includes penalty rates in the denominator (Traditional, Roth, HSA). Previously, penalties were calculated but not funded by the withdrawal amount, making projections overly optimistic. 66 tests (50 unit + 16 integration). |
 | v7.1 | 2026-02-08 | **Simplified Inflation** — Single global inflation rate for all expenses. Replaced per-expense `inflationRate: number` with `inflationAdjusted?: boolean` (default true, false = fixed cost). Removed `HomeExpense.inflationRate`. UI: checkbox toggle replaces PercentInput, "Fixed" badge on expense rows. Migration converts legacy data. 63 tests. |
 | v7.0 | 2026-02-08 | **Per-Account Contributions** — Moved contributions from employment to individual accounts (`annualContribution` + start/end year). Removed surplus auto-deposit. Simplified `EmploymentIncome` to gross + tax rate. 63 tests (47 unit + 16 integration). |
 | v6.1 | 2026-02-07 | **Engine Refactor** — Split 1545-line `calculations.ts` into 10 focused modules under `calculations/`. Added 16 integration tests (62 total). Zero logic changes. |

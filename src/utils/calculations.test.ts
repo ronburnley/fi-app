@@ -668,6 +668,105 @@ describe('Withdrawal Penalties', () => {
     // Age 65+: No HSA penalty
     expect(projections[5].withdrawalPenalty).toBe(0);
   });
+
+  it('traditional penalty is funded by the gross-up withdrawal', () => {
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 50, lifeExpectancy: 65, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'trad-1', name: 'Traditional', type: 'traditional', owner: 'self', balance: 1000000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0, inflationRate: 0,
+        traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
+        withdrawalOrder: ['traditional'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const year = projections[0]; // age 50, penalty applies
+
+    // Withdrawal must be larger than expenses to cover tax + penalty
+    expect(year.withdrawal).toBeGreaterThan(year.expenses);
+    // Net after tax + penalty must cover expenses
+    const net = year.withdrawal - year.federalTax - year.stateTax - year.withdrawalPenalty;
+    expect(net).toBeCloseTo(year.expenses, 0);
+
+    // After penalty-free age (60+), gross-up only covers taxes
+    const yearAt60 = projections[10]; // age 60
+    expect(yearAt60.withdrawalPenalty).toBe(0);
+    const net60 = yearAt60.withdrawal - yearAt60.federalTax - yearAt60.stateTax;
+    expect(net60).toBeCloseTo(yearAt60.expenses, 0);
+  });
+
+  it('roth penalty is funded by the gross-up withdrawal', () => {
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 50, lifeExpectancy: 65, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'roth-1', name: 'Roth', type: 'roth', owner: 'self', balance: 1000000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0, inflationRate: 0,
+        traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
+        withdrawalOrder: ['roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const year = projections[0]; // age 50, penalty applies
+
+    // Roth withdrawal must be larger than expenses to cover penalty
+    expect(year.withdrawal).toBeGreaterThan(year.expenses);
+    // Net after penalty must cover expenses
+    const net = year.withdrawal - year.withdrawalPenalty;
+    expect(net).toBeCloseTo(year.expenses, 0);
+  });
+
+  it('HSA penalty is funded by the gross-up withdrawal', () => {
+    const state = createTestState({
+      profile: { currentAge: 60, targetFIAge: 60, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'hsa-1', name: 'HSA', type: 'hsa', owner: 'self', balance: 500000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 20000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0, inflationRate: 0,
+        traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const year = projections[0]; // age 60, HSA penalty applies
+
+    // HSA withdrawal must be larger than expenses to cover penalty
+    expect(year.withdrawal).toBeGreaterThan(year.expenses);
+    // Net after penalty must cover expenses
+    const net = year.withdrawal - year.withdrawalPenalty;
+    expect(net).toBeCloseTo(year.expenses, 0);
+  });
 });
 
 // ==================== Contribution Distribution ====================
