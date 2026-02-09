@@ -199,6 +199,7 @@ export interface YearProjection {
   expenses: number;
   income: number;                 // SS + pension + retirement income streams
   employmentIncome: number;       // Net after-tax employment income
+  employmentTax: number;          // Tax deducted from gross employment income
   contributions: number;          // Added to retirement accounts
   retirementIncome: number;       // Non-SS/pension retirement streams
   gap: number;

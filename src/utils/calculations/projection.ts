@@ -193,6 +193,7 @@ export function calculateProjection(
       expenses: yearExpenses,
       income: totalIncome,
       employmentIncome: employmentResult.netIncome,
+      employmentTax: employmentResult.tax,
       contributions: yearContributions,
       retirementIncome: retirementIncomeStreams,
       gap,

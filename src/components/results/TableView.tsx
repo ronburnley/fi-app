@@ -63,6 +63,9 @@ export function TableView() {
                     Emp. Inc
                   </th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                    Emp. Tax
+                  </th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                     Contrib
                   </th>
                 </>
@@ -156,6 +159,9 @@ export function TableView() {
                     <>
                       <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                         {projection.employmentIncome > 0 ? formatCurrency(projection.employmentIncome) : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                        {projection.employmentTax > 0 ? formatCurrency(projection.employmentTax) : '-'}
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                         <span className={projection.contributions > 0 ? 'text-emerald-400' : 'text-text-muted'}>

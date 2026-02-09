@@ -215,6 +215,7 @@ describe('Employment Income Calculations', () => {
     // Net = Gross - Tax
     // Net = 150000 - 37500 = 112500
     expect(year1.employmentIncome).toBe(112500);
+    expect(year1.employmentTax).toBe(37500);
     expect(year1.phase).toBe('accumulating');
   });
 
@@ -240,6 +241,8 @@ describe('Employment Income Calculations', () => {
     // Spouse: Net = 100000 - 22000 = 78000
     // Combined Net = 190500
     expect(year1.employmentIncome).toBe(190500);
+    // Combined Tax = 37500 + 22000 = 59500
+    expect(year1.employmentTax).toBe(59500);
   });
 
   it('stops employment income at FI age', () => {
@@ -259,11 +262,13 @@ describe('Employment Income Calculations', () => {
     // Age 50-54: Still accumulating, employment active
     // Net = 150000 - 37500 = 112500
     expect(projections[0].employmentIncome).toBe(112500);
+    expect(projections[0].employmentTax).toBe(37500);
     expect(projections[0].phase).toBe('accumulating');
     expect(projections[4].employmentIncome).toBe(112500);
 
     // Age 55: FI — no employment
     expect(projections[5].employmentIncome).toBe(0);
+    expect(projections[5].employmentTax).toBe(0);
     expect(projections[5].phase).toBe('fi');
   });
 
