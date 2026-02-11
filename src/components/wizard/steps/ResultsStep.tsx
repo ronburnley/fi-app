@@ -33,3 +33,5 @@ export function ResultsStep() {
     </div>
   );
 }
+
+export default ResultsStep;

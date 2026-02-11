@@ -323,3 +323,5 @@ export function IncomeStep() {
     </div>
   );
 }
+
+export default IncomeStep;

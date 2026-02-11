@@ -19,3 +19,5 @@ export function BenefitsStep() {
     </div>
   );
 }
+
+export default BenefitsStep;

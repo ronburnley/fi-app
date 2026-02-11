@@ -20,3 +20,5 @@ export function AssumptionsStep() {
     </div>
   );
 }
+
+export default AssumptionsStep;

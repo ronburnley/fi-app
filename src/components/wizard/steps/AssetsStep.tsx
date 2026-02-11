@@ -285,3 +285,5 @@ export function AssetsStep() {
     </div>
   );
 }
+
+export default AssetsStep;

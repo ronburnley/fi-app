@@ -20,3 +20,5 @@ export function LifeEventsStep() {
     </div>
   );
 }
+
+export default LifeEventsStep;

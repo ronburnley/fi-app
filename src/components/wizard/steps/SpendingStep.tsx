@@ -616,3 +616,5 @@ export function SpendingStep() {
     </div>
   );
 }
+
+export default SpendingStep;
