@@ -3,7 +3,7 @@ import { WizardNavigation } from '../WizardNavigation';
 
 export function LifeEventsStep() {
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-lg mx-auto">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-semibold text-text-primary mb-2">
           Life Events
@@ -16,7 +16,7 @@ export function LifeEventsStep() {
 
       <LifeEventsSection />
 
-      <WizardNavigation showSkip />
+      <WizardNavigation />
     </div>
   );
 }

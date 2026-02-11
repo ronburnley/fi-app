@@ -3,21 +3,16 @@ import { useWizard } from './WizardContext';
 
 interface WizardNavigationProps {
   onValidate?: () => boolean;
-  showSkip?: boolean;
   disabled?: boolean;
 }
 
-export function WizardNavigation({ onValidate, showSkip = false, disabled = false }: WizardNavigationProps) {
+export function WizardNavigation({ onValidate, disabled = false }: WizardNavigationProps) {
   const { currentStep, nextStep, prevStep, canGoBack, isLastStep } = useWizard();
 
   const handleNext = () => {
     if (onValidate && !onValidate()) {
       return;
     }
-    nextStep();
-  };
-
-  const handleSkip = () => {
     nextStep();
   };
 
@@ -41,11 +36,6 @@ export function WizardNavigation({ onValidate, showSkip = false, disabled = fals
         )}
       </div>
       <div className="flex gap-3">
-        {showSkip && (
-          <Button variant="secondary" onClick={handleSkip}>
-            Skip
-          </Button>
-        )}
         <Button onClick={handleNext} disabled={disabled}>
           {currentStep === 7 ? 'View Results' : 'Continue'}
         </Button>

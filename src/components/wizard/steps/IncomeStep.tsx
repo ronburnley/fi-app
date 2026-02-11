@@ -317,7 +317,7 @@ export function IncomeStep() {
         </div>
       </div>
 
-      <WizardNavigation showSkip />
+      <WizardNavigation />
 
       {/* Add Retirement Income Modal */}
       {isAddingRetirementIncome && (

@@ -16,7 +16,7 @@ export function AssumptionsStep() {
 
       <AssumptionsSection />
 
-      <WizardNavigation showSkip />
+      <WizardNavigation />
     </div>
   );
 }
