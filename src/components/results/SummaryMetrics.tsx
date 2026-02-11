@@ -133,6 +133,28 @@ export function SummaryMetrics() {
           </p>
         </div>
       </div>
+
+      {/* Surplus insight — only when FI is achievable with meaningful surplus */}
+      {isAchievable && summary.surplusAtLE !== undefined && summary.surplusAtLE > 50000 && (
+        <div className="p-4 rounded-lg bg-bg-secondary border border-border-subtle">
+          <p className="text-xs text-text-muted mb-2">Portfolio Insight</p>
+          <div className="space-y-1">
+            <p className="text-sm text-text-secondary">
+              <span className="text-text-primary font-medium">{formatCurrency(summary.surplusAtLE, true)}</span> remaining at age {state.profile.lifeExpectancy}
+            </p>
+            {summary.bottleneckAge !== undefined && summary.bottleneckBalance !== undefined && (
+              <p className="text-sm text-text-secondary">
+                Lowest balance: <span className="text-text-primary font-medium">{formatCurrency(summary.bottleneckBalance, true)}</span> at age {summary.bottleneckAge}
+              </p>
+            )}
+            {state.assumptions.fiPhaseReturn === undefined && (
+              <p className="text-xs text-text-muted mt-2">
+                Surplus may be overstated — set a lower Retirement Return in Assumptions to model conservative post-FI allocation.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
