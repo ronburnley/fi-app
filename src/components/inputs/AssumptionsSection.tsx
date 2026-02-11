@@ -1,15 +1,19 @@
-import { Card, PercentInput, Toggle } from '../ui';
+import { Card, PercentInput, Toggle, CurrencyInput, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
-import type { PenaltySettings } from '../../types';
+import { ACCOUNT_TYPE_LABELS } from '../../constants/defaults';
+import type { Assumptions, AccumulationSurplusHandling, PenaltySettings } from '../../types';
 
 export function AssumptionsSection() {
   const { state, dispatch } = useApp();
   const { assumptions } = state;
+  const surplusHandling = assumptions.accumulationSurplusHandling ?? 'ignore';
+  const surplusAccountType = assumptions.accumulationSurplusAccountType ?? 'taxable';
+  const hasSurplusDestinationAccount = state.assets.accounts.some((account) => account.type === surplusAccountType);
 
-  const updateAssumptions = (field: string, value: number) => {
+  const updateAssumptions = (payload: Partial<Assumptions>) => {
     dispatch({
       type: 'UPDATE_ASSUMPTIONS',
-      payload: { [field]: value },
+      payload,
     });
   };
 
@@ -30,19 +34,27 @@ export function AssumptionsSection() {
       <div className="space-y-4">
         <div>
           <p className="text-xs text-text-muted mb-3">Growth & Inflation</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <PercentInput
-              label="Investment Return"
+              label="Accumulation Return"
               value={assumptions.investmentReturn}
-              onChange={(value) => updateAssumptions('investmentReturn', value)}
-              hint="Nominal annual return"
+              onChange={(value) => updateAssumptions({ investmentReturn: value })}
+              hint="Growth during working years"
+              min={-20}
+              max={20}
+            />
+            <PercentInput
+              label="Retirement Return"
+              value={assumptions.fiPhaseReturn ?? assumptions.investmentReturn}
+              onChange={(value) => updateAssumptions({ fiPhaseReturn: value })}
+              hint="Growth after FI (typically 3-5%)"
               min={-20}
               max={20}
             />
             <PercentInput
               label="General Inflation"
               value={assumptions.inflationRate}
-              onChange={(value) => updateAssumptions('inflationRate', value)}
+              onChange={(value) => updateAssumptions({ inflationRate: value })}
               hint="Applied to all expenses & retirement income"
               min={0}
               max={15}
@@ -50,7 +62,7 @@ export function AssumptionsSection() {
             <PercentInput
               label="Withdrawal Rate"
               value={assumptions.safeWithdrawalRate}
-              onChange={(value) => updateAssumptions('safeWithdrawalRate', value)}
+              onChange={(value) => updateAssumptions({ safeWithdrawalRate: value })}
               hint="Sets FI Number target (reference only)"
               min={1}
               max={10}
@@ -59,12 +71,47 @@ export function AssumptionsSection() {
         </div>
 
         <div className="pt-3 border-t border-border-subtle">
+          <p className="text-xs text-text-muted mb-3">FI Targeting</p>
+          <div className="grid grid-cols-2 gap-3">
+            <CurrencyInput
+              label="Terminal Balance Target"
+              value={assumptions.terminalBalanceTarget ?? 0}
+              onChange={(value) => updateAssumptions({ terminalBalanceTarget: Math.max(0, value) })}
+              hint="Target balance at life expectancy (default $0)"
+            />
+            <Select
+              label="Working-Year Surplus"
+              value={surplusHandling}
+              onChange={(value) => updateAssumptions({ accumulationSurplusHandling: value as AccumulationSurplusHandling })}
+              options={[
+                { value: 'ignore', label: 'Ignore (current behavior)' },
+                { value: 'route_to_account', label: 'Route to account' },
+              ]}
+              hint="Controls surplus while still working"
+            />
+          </div>
+          {surplusHandling === 'route_to_account' && (
+            <div className="mt-3">
+              <Select
+                label="Surplus Destination Account Type"
+                value={surplusAccountType}
+                onChange={(value) => updateAssumptions({ accumulationSurplusAccountType: value as Assumptions['accumulationSurplusAccountType'] })}
+                options={Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+                hint={hasSurplusDestinationAccount
+                  ? `Surplus is added to your largest ${ACCOUNT_TYPE_LABELS[surplusAccountType]} account.`
+                  : `No ${ACCOUNT_TYPE_LABELS[surplusAccountType]} account found yet. Surplus will be ignored until one exists.`}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="pt-3 border-t border-border-subtle">
           <p className="text-xs text-text-muted mb-3">Federal Tax Rates</p>
           <div className="grid grid-cols-2 gap-3">
             <PercentInput
               label="Income Tax"
               value={assumptions.traditionalTaxRate}
-              onChange={(value) => updateAssumptions('traditionalTaxRate', value)}
+              onChange={(value) => updateAssumptions({ traditionalTaxRate: value })}
               hint="On traditional withdrawals"
               min={0}
               max={50}
@@ -72,7 +119,7 @@ export function AssumptionsSection() {
             <PercentInput
               label="Capital Gains"
               value={assumptions.capitalGainsTaxRate}
-              onChange={(value) => updateAssumptions('capitalGainsTaxRate', value)}
+              onChange={(value) => updateAssumptions({ capitalGainsTaxRate: value })}
               hint="On taxable account gains"
               min={0}
               max={40}

@@ -4,7 +4,7 @@
 
 **FI Runway** is a financial independence calculator. It answers: *"When can I achieve financial independence?"*
 
-The app **calculates** the earliest achievable FI age via binary search — the user provides financial inputs, and the app finds the earliest age where all employment can stop and money lasts through life expectancy.
+The app calculates FI age by testing candidate stop-working ages and choosing the viable age whose projected terminal balance is closest to the configured target (default `$0` at life expectancy).
 
 **Target user:** People approaching early retirement who need verification that they can stop working.
 
@@ -18,7 +18,7 @@ The app **calculates** the earliest achievable FI age via binary search — the 
 
 | Phase | When | What happens |
 |-------|------|-------------|
-| **Accumulating** | age < FI age | Employment income covers expenses, per-account contributions grow balances. Surplus (income > expenses) is untracked. |
+| **Accumulating** | age < FI age | Employment income covers expenses, per-account contributions grow balances. Surplus can be ignored (default) or routed to a selected account type. |
 | **FI** | age >= FI age | No employment. Portfolio + passive income (SS, pension, retirement streams) sustain spending via withdrawals. |
 
 There is no "gap" phase. FI age = when employment stops.
@@ -61,7 +61,7 @@ For each year from `currentAge` to `lifeExpectancy`:
 
 1. **Determine phase** — accumulating or FI based on age vs FI age
 2. **Add per-account contributions** — each account with `annualContribution` gets funded if year is within [startYear, endYear]. Contributions are phase-independent (date-bounded, not tied to employment).
-3. **Calculate employment income** — gross - tax (net income). Surplus (income > expenses) is ignored.
+3. **Calculate employment income** — gross - tax (net income). Surplus can optionally be routed to a selected account type.
 4. **Calculate expenses** — global-inflation-adjusted (unless `inflationAdjusted: false`) + life events
 5. **Calculate passive income** — Social Security (FRA-adjusted + COLA), pension (+ COLA), retirement income streams
 6. **Calculate gap** — expenses minus all income
@@ -83,9 +83,9 @@ For each year from `currentAge` to `lifeExpectancy`:
 
 `monthlyBenefit` is stored as the FRA (age 67) amount. Auto-adjusted by claiming age: 62 = 0.70x, 67 = 1.00x, 70 = 1.24x. COLA compounds on the adjusted amount.
 
-### FI Age Binary Search
+### FI Age Search
 
-`calculateAchievableFIAge()` tests candidate FI ages. Each candidate means a different accumulation length — more working years = more contributions and growth. Binary search converges in ~7 iterations.
+`calculateAchievableFIAge()` tests candidate FI ages from current age through `lifeExpectancy - 1`. It keeps only viable ages (no shortfall), then picks the age whose terminal balance is closest to `terminalBalanceTarget` (default `$0`).
 
 Confidence levels based on buffer past life expectancy: high (10+), moderate (5-9), tight (0-4), not_achievable (shortfall).
 
@@ -139,6 +139,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v8.0 | 2026-02-11 | **Depletion Target + Optional Surplus Routing + Shortfall Fix** — FI age selection now targets a configurable terminal balance (`terminalBalanceTarget`, default `$0`) instead of earliest-viable binary search. Added Assumptions controls for working-year surplus handling (`ignore` default or `route_to_account`) and destination account type. Fixed shortfall detection to use unmet net need after taxes/penalties (not gross withdrawal comparisons), and updated shortfall guidance to use unmet need. Added regression tests for terminal target selection, optional surplus routing, and gross-vs-net shortfall edge case. |
 | v7.9 | 2026-02-11 | **Employment Income Annual Growth Rate** — Added optional `annualGrowthRate` to `EmploymentIncome` for modeling salary raises. Compound growth applied during accumulation: `gross * (1 + rate)^yearsSinceStart`. Tax calculated on grown gross. Independent rates for primary and spouse. UI: "Annual Raise" PercentInput (0-20%) on Income step. Backward-compatible — undefined/zero = static salary. 72 tests. |
 | v7.8 | 2026-02-11 | **FI Achievability Fix + Auto-Hide Table Columns** — Removed hidden 5-year buffer from `testFIAge()` that tested viability against LE+5 instead of actual life expectancy, causing false "not achievable" results when portfolios lasted through the planning horizon. Confidence levels (high/moderate/tight) already communicate safety margin. Timeline table now auto-hides columns that are all-zero (Income, Gap, Withdrawal, taxes, account balances, Mortgage). 66 tests. |
 | v7.7 | 2026-02-11 | **Empty Income Defaults + Live Comma Formatting** — Zeroed out pre-populated employment income defaults ($150K/$100K → $0/$0) so new users start blank, consistent with v7.4. CurrencyInput now shows comma-formatted numbers while typing (was format-on-blur only) with stable cursor positioning. 66 tests. |

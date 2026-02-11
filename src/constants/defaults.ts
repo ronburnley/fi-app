@@ -68,6 +68,9 @@ export const DEFAULT_STATE: AppState = {
       hsaEarlyPenaltyRate: 0.20,
       enableRule55: false,
     },
+    terminalBalanceTarget: 0,
+    accumulationSurplusHandling: 'ignore',
+    accumulationSurplusAccountType: 'taxable',
   },
 };
 

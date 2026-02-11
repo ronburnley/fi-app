@@ -132,6 +132,10 @@ export function validateAssumptions(assumptions: Assumptions): ValidationError[]
     errors.push({ field: 'safeWithdrawalRate', message: 'Safe withdrawal rate should be between 1% and 10%' });
   }
 
+  if (assumptions.terminalBalanceTarget !== undefined && assumptions.terminalBalanceTarget < 0) {
+    errors.push({ field: 'terminalBalanceTarget', message: 'Terminal balance target cannot be negative' });
+  }
+
   // Validate penalty settings
   if (assumptions.penaltySettings) {
     if (assumptions.penaltySettings.earlyWithdrawalPenaltyRate < 0 || assumptions.penaltySettings.earlyWithdrawalPenaltyRate > 0.25) {
