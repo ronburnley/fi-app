@@ -19,7 +19,8 @@ export function calculateProjection(
   // Apply what-if adjustments
   const spendingMultiplier = 1 + (whatIf?.spendingAdjustment || 0);
   const effectiveFIAge = state.profile.targetFIAge;
-  const effectiveReturn = whatIf?.returnAdjustment ?? state.assumptions.investmentReturn;
+  const accumulationReturn = whatIf?.returnAdjustment ?? state.assumptions.investmentReturn;
+  const fiReturn = state.assumptions.fiPhaseReturn ?? accumulationReturn;
   const effectiveSSAge = whatIf?.ssStartAge ?? state.socialSecurity.startAge;
 
   // Initialize balances from array-based assets
@@ -29,6 +30,44 @@ export function calculateProjection(
   const { assumptions, socialSecurity, lifeEvents, profile, assets, income } = state;
   const penaltySettings = assumptions.penaltySettings;
   const stateTaxInfo = getStateTaxInfo(profile.state);
+  const surplusHandling = assumptions.accumulationSurplusHandling ?? 'ignore';
+  const surplusAccountType = assumptions.accumulationSurplusAccountType ?? 'taxable';
+
+  const recalculateBalancesFromMap = () => aggregateBalances(
+    assets.accounts.map((a) => ({
+      ...a,
+      balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
+      costBasis: assetBalanceMap.get(a.id)?.costBasis ?? a.costBasis,
+    }))
+  );
+
+  const routeAccumulationSurplus = (surplus: number) => {
+    if (surplus <= 0) return;
+
+    const destinationAssets = assets.accounts.filter((a) => a.type === surplusAccountType);
+    if (destinationAssets.length === 0) return;
+
+    // Route to the largest matching account to keep behavior deterministic.
+    const destination = destinationAssets.reduce((best, current) => {
+      const bestBalance = assetBalanceMap.get(best.id)?.balance ?? best.balance;
+      const currentBalance = assetBalanceMap.get(current.id)?.balance ?? current.balance;
+      return currentBalance > bestBalance ? current : best;
+    });
+
+    const balanceInfo = assetBalanceMap.get(destination.id);
+    if (!balanceInfo) return;
+
+    const isTaxableLike = destination.type === 'taxable' || destination.type === '529' || destination.type === 'other';
+    assetBalanceMap.set(destination.id, {
+      ...balanceInfo,
+      balance: balanceInfo.balance + surplus,
+      costBasis: isTaxableLike
+        ? (balanceInfo.costBasis ?? 0) + surplus
+        : balanceInfo.costBasis,
+    });
+
+    balances = recalculateBalancesFromMap();
+  };
 
   for (let age = profile.currentAge; age <= profile.lifeExpectancy; age++) {
     const year = currentYear + (age - profile.currentAge);
@@ -124,13 +163,7 @@ export function calculateProjection(
     assetBalanceMap = contributionResult.updatedMap;
     const yearContributions = contributionResult.totalContributions;
     if (yearContributions > 0) {
-      balances = aggregateBalances(
-        assets.accounts.map((a) => ({
-          ...a,
-          balance: assetBalanceMap.get(a.id)?.balance ?? a.balance,
-          costBasis: assetBalanceMap.get(a.id)?.costBasis ?? a.costBasis,
-        }))
-      );
+      balances = recalculateBalancesFromMap();
     }
 
     // Step 2: Calculate expenses and income
@@ -144,11 +177,16 @@ export function calculateProjection(
     let stateTax = 0;
     let withdrawalSource = 'N/A';
     let gap = 0;
+    let unmetNeed = 0;
 
     // Step 3: Determine if there's a deficit requiring withdrawals
-    // Employment income covers expenses and contributions; surplus is untracked (ignored)
     const allIncome = employmentResult.netIncome + totalIncome;
     const deficit = yearExpenses + yearContributions - allIncome;
+
+    // Optionally route accumulation surplus to an account.
+    if (phase === 'accumulating' && surplusHandling === 'route_to_account') {
+      routeAccumulationSurplus(Math.max(0, -deficit));
+    }
 
     if (deficit > 0) {
       gap = deficit;
@@ -168,6 +206,7 @@ export function calculateProjection(
       withdrawalPenalty = result.penalty;
       federalTax = result.federalTax;
       stateTax = result.stateTax;
+      unmetNeed = result.unmetNeed;
       withdrawalSource = result.source;
       balances = result.balances;
       assetBalanceMap = result.assetBalances;
@@ -182,7 +221,7 @@ export function calculateProjection(
 
     // Check for shortfall
     const totalBalance = balances.taxable + balances.traditional + balances.roth + balances.hsa + balances.cash;
-    const isShortfall = gap > 0 && totalBalance < gap && withdrawal < gap;
+    const isShortfall = gap > 0 && unmetNeed > 0.01;
 
     // Record this year's projection
     const totalNetWorth = totalBalance;
@@ -198,6 +237,7 @@ export function calculateProjection(
       contributions: yearContributions,
       retirementIncome: retirementIncomeStreams,
       gap,
+      unmetNeed,
       withdrawal,
       withdrawalPenalty,
       federalTax,
@@ -214,9 +254,11 @@ export function calculateProjection(
     });
 
     // Grow balances for next year (if not in shortfall)
+    // Use lower FI return during retirement phase, accumulation return during working years
     if (!isShortfall) {
-      balances = growBalances(balances, effectiveReturn);
-      assetBalanceMap = growAssetBalances(assetBalanceMap, assets.accounts, effectiveReturn);
+      const yearReturn = phase === 'fi' ? fiReturn : accumulationReturn;
+      balances = growBalances(balances, yearReturn);
+      assetBalanceMap = growAssetBalances(assetBalanceMap, assets.accounts, yearReturn);
     }
   }
 

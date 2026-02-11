@@ -171,9 +171,11 @@ export interface Income {
 }
 
 export type WithdrawalSource = 'taxable' | 'traditional' | 'roth';
+export type AccumulationSurplusHandling = 'ignore' | 'route_to_account';
 
 export interface Assumptions {
   investmentReturn: number;
+  fiPhaseReturn?: number;  // Return rate during FI phase. undefined = use investmentReturn.
   inflationRate: number;
   traditionalTaxRate: number;
   capitalGainsTaxRate: number;
@@ -181,6 +183,9 @@ export interface Assumptions {
   withdrawalOrder: WithdrawalSource[];
   safeWithdrawalRate: number;
   penaltySettings: PenaltySettings;
+  terminalBalanceTarget?: number; // Target balance at life expectancy (default 0)
+  accumulationSurplusHandling?: AccumulationSurplusHandling; // Default: ignore
+  accumulationSurplusAccountType?: AccountType; // Used when handling is route_to_account
 }
 
 export interface AppState {
@@ -204,6 +209,7 @@ export interface YearProjection {
   contributions: number;          // Added to retirement accounts
   retirementIncome: number;       // Non-SS/pension retirement streams
   gap: number;
+  unmetNeed: number;              // Remaining deficit after all withdrawals
   withdrawal: number;
   withdrawalPenalty: number;
   federalTax: number;
@@ -227,6 +233,9 @@ export interface ProjectionSummary {
   hasShortfall: boolean;
   shortfallAge: number | null;
   bufferYears: number;
+  surplusAtLE?: number;
+  bottleneckAge?: number;
+  bottleneckBalance?: number;
 }
 
 export interface WhatIfAdjustments {

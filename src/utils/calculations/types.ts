@@ -19,6 +19,7 @@ export interface WithdrawalResult {
   penalty: number;
   federalTax: number;
   stateTax: number;
+  unmetNeed: number;
   source: string;
   balances: AccountBalances;
   assetBalances: Map<string, { balance: number; costBasis?: number }>; // Track individual asset balances

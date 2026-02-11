@@ -346,6 +346,7 @@ export function withdrawFromAccounts(
     penalty: totalPenalty,
     federalTax: totalFederalTax,
     stateTax: totalStateTax,
+    unmetNeed: Math.max(0, remaining),
     source: sources.join(', ') || 'None',
     balances: newBalances,
     assetBalances: newAssetBalanceMap,

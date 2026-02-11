@@ -51,7 +51,7 @@ export function ProjectionProvider({ children }: { children: ReactNode }) {
 
   // Sync targetFIAge with calculated achievable FI age
   useEffect(() => {
-    // When achievable, set targetFIAge to the earliest FI age.
+    // When achievable, set targetFIAge to the calculated FI age.
     // When not achievable, set targetFIAge to lifeExpectancy - 1 (work as long as possible)
     // to keep employment income visible in projections and match shortfall guidance.
     const newFIAge = achievableFI.achievableFIAge ?? (lifeExpectancy - 1);

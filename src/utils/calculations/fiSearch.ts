@@ -3,20 +3,21 @@ import type {
   WhatIfAdjustments,
   AchievableFIResult,
   ShortfallGuidance,
+  YearProjection,
 } from '../../types';
 import { calculateProjection } from './projection';
 
-/**
- * Test if a given FI age is viable (no shortfall before life expectancy)
- *
- * Tests whether money lasts through the user's actual life expectancy.
- * The confidence level system (high/moderate/tight) communicates safety margin separately.
- */
-function testFIAge(
+interface FIAgeEvaluation {
+  projections: YearProjection[];
+  shortfallYear: YearProjection | undefined;
+  terminalBalance: number;
+}
+
+function evaluateFIAge(
   state: AppState,
   fiAge: number,
   whatIf?: WhatIfAdjustments
-): boolean {
+): FIAgeEvaluation {
   const testState: AppState = {
     ...state,
     profile: {
@@ -26,8 +27,49 @@ function testFIAge(
   };
 
   const projections = calculateProjection(testState, whatIf);
+  const shortfallYear = projections.find((p) => p.isShortfall);
+  const terminalBalance = projections[projections.length - 1]?.totalNetWorth ?? 0;
 
-  return !projections.some((p) => p.isShortfall);
+  return { projections, shortfallYear, terminalBalance };
+}
+
+function isFIAgeViable(
+  state: AppState,
+  fiAge: number,
+  whatIf?: WhatIfAdjustments
+): boolean {
+  return !evaluateFIAge(state, fiAge, whatIf).shortfallYear;
+}
+
+function calculateConfidence(
+  state: AppState,
+  fiAge: number,
+  lifeExpectancy: number,
+  whatIf?: WhatIfAdjustments
+): Pick<AchievableFIResult, 'confidenceLevel' | 'bufferYears'> {
+  const testState: AppState = {
+    ...state,
+    profile: {
+      ...state.profile,
+      targetFIAge: fiAge,
+      lifeExpectancy: 120,
+    },
+  };
+  const projections = calculateProjection(testState, whatIf);
+  const shortfallYear = projections.find((p) => p.isShortfall);
+  const runwayAge = shortfallYear ? shortfallYear.age - 1 : 120;
+  const bufferYears = runwayAge - lifeExpectancy;
+
+  let confidenceLevel: AchievableFIResult['confidenceLevel'];
+  if (bufferYears >= 10) {
+    confidenceLevel = 'high';
+  } else if (bufferYears >= 5) {
+    confidenceLevel = 'moderate';
+  } else {
+    confidenceLevel = 'tight';
+  }
+
+  return { confidenceLevel, bufferYears };
 }
 
 /**
@@ -40,20 +82,13 @@ function calculateShortfallGuidance(
   whatIf?: WhatIfAdjustments
 ): ShortfallGuidance {
   const { lifeExpectancy } = state.profile;
+  const latestFIAge = lifeExpectancy - 1;
 
-  // Find when money runs out (test at latest possible FI = life expectancy - 1)
-  const testState: AppState = {
-    ...state,
-    profile: {
-      ...state.profile,
-      targetFIAge: lifeExpectancy - 1,
-    },
-  };
-  const projections = calculateProjection(testState, whatIf);
-  const shortfallYear = projections.find((p) => p.isShortfall);
+  // Find when money runs out (test at latest possible FI = life expectancy - 1).
+  const { projections, shortfallYear } = evaluateFIAge(state, latestFIAge, whatIf);
   const runsOutAtAge = shortfallYear ? shortfallYear.age : lifeExpectancy;
 
-  // Binary search for spending reduction that makes FI achievable at lifeExpectancy - 1
+  // Search for spending reduction that makes FI achievable at lifeExpectancy - 1
   let spendingReductionNeeded = 0;
   const currentSpendingMultiplier = 1 + (whatIf?.spendingAdjustment || 0);
 
@@ -65,7 +100,7 @@ function calculateShortfallGuidance(
       returnAdjustment: whatIf?.returnAdjustment ?? state.assumptions.investmentReturn,
       ssStartAge: whatIf?.ssStartAge ?? state.socialSecurity.startAge,
     };
-    if (testFIAge(state, lifeExpectancy - 1, adjustedWhatIf)) {
+    if (isFIAgeViable(state, latestFIAge, adjustedWhatIf)) {
       // Calculate annual dollar amount of reduction needed
       const currentYear = new Date().getFullYear();
       let baseSpending = 0;
@@ -92,7 +127,7 @@ function calculateShortfallGuidance(
   const yearsToLE = lifeExpectancy - state.profile.currentAge;
   const shortfallAmount = projections
     .filter((p) => p.isShortfall)
-    .reduce((sum, p) => sum + Math.max(0, p.gap - p.withdrawal), 0);
+    .reduce((sum, p) => sum + p.unmetNeed, 0);
   const additionalSavingsNeeded = yearsToLE > 0 ? Math.round(shortfallAmount / yearsToLE) : 0;
 
   return {
@@ -103,51 +138,36 @@ function calculateShortfallGuidance(
 }
 
 /**
- * Calculate the earliest achievable FI age using binary search
+ * Calculate achievable FI age based on terminal-balance targeting.
  */
 export function calculateAchievableFIAge(
   state: AppState,
   whatIf?: WhatIfAdjustments
 ): AchievableFIResult {
   const { currentAge, lifeExpectancy } = state.profile;
+  const latestPossibleFIAge = Math.max(currentAge, lifeExpectancy - 1);
+  const targetTerminalBalance = state.assumptions.terminalBalanceTarget ?? 0;
 
-  // First, test if already FI at current age
-  if (testFIAge(state, currentAge, whatIf)) {
-    // Calculate buffer by finding how long money lasts past life expectancy
-    const testState: AppState = {
-      ...state,
-      profile: {
-        ...state.profile,
-        targetFIAge: currentAge,
-        lifeExpectancy: 120, // Extend to find true runway
-      },
-    };
-    const projections = calculateProjection(testState, whatIf);
-    const shortfallYear = projections.find((p) => p.isShortfall);
-    const runwayAge = shortfallYear ? shortfallYear.age - 1 : 120;
-    const bufferYears = runwayAge - lifeExpectancy;
+  // Find viable FI ages and choose the one whose terminal balance
+  // is closest to the configured target (default $0).
+  let bestAge: number | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
 
-    let confidenceLevel: AchievableFIResult['confidenceLevel'];
-    if (bufferYears >= 10) {
-      confidenceLevel = 'high';
-    } else if (bufferYears >= 5) {
-      confidenceLevel = 'moderate';
-    } else {
-      confidenceLevel = 'tight';
+  for (let fiAge = currentAge; fiAge <= latestPossibleFIAge; fiAge++) {
+    const evaluation = evaluateFIAge(state, fiAge, whatIf);
+    if (evaluation.shortfallYear) continue;
+
+    const distance = Math.abs(evaluation.terminalBalance - targetTerminalBalance);
+    if (
+      distance < bestDistance ||
+      (Math.abs(distance - bestDistance) < 0.01 && (bestAge === null || fiAge < bestAge))
+    ) {
+      bestAge = fiAge;
+      bestDistance = distance;
     }
-
-    return {
-      achievableFIAge: currentAge,
-      confidenceLevel,
-      bufferYears,
-      yearsUntilFI: 0,
-      fiAtCurrentAge: true,
-    };
   }
 
-  // Test if FI is ever achievable (test at life expectancy - 1)
-  if (!testFIAge(state, lifeExpectancy - 1, whatIf)) {
-    // Calculate shortfall guidance
+  if (bestAge === null) {
     const shortfallGuidance = calculateShortfallGuidance(state, whatIf);
 
     return {
@@ -160,53 +180,20 @@ export function calculateAchievableFIAge(
     };
   }
 
-  // Binary search for earliest viable FI age
-  let low = currentAge;
-  let high = lifeExpectancy - 1;
-
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-
-    if (testFIAge(state, mid, whatIf)) {
-      // This age works, try earlier
-      high = mid;
-    } else {
-      // This age doesn't work, try later
-      low = mid + 1;
-    }
-  }
-
-  const achievableFIAge = low;
+  const achievableFIAge = bestAge;
   const yearsUntilFI = achievableFIAge - currentAge;
-
-  // Calculate buffer for the achievable age
-  const testState: AppState = {
-    ...state,
-    profile: {
-      ...state.profile,
-      targetFIAge: achievableFIAge,
-      lifeExpectancy: 120, // Extend to find true runway
-    },
-  };
-  const projections = calculateProjection(testState, whatIf);
-  const shortfallYear = projections.find((p) => p.isShortfall);
-  const runwayAge = shortfallYear ? shortfallYear.age - 1 : 120;
-  const bufferYears = runwayAge - lifeExpectancy;
-
-  let confidenceLevel: AchievableFIResult['confidenceLevel'];
-  if (bufferYears >= 10) {
-    confidenceLevel = 'high';
-  } else if (bufferYears >= 5) {
-    confidenceLevel = 'moderate';
-  } else {
-    confidenceLevel = 'tight';
-  }
+  const { confidenceLevel, bufferYears } = calculateConfidence(
+    state,
+    achievableFIAge,
+    lifeExpectancy,
+    whatIf
+  );
 
   return {
     achievableFIAge,
     confidenceLevel,
     bufferYears,
     yearsUntilFI,
-    fiAtCurrentAge: false,
+    fiAtCurrentAge: achievableFIAge === currentAge,
   };
 }

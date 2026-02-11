@@ -1052,6 +1052,51 @@ describe('Surplus Handling', () => {
     expect(year1.taxableBalance).toBe(100000);
     expect(year1.withdrawalSource).toBe('N/A');
   });
+
+  it('optionally routes accumulation surplus to selected account type', () => {
+    const state = createTestState({
+      profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 60, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 100000, costBasis: 80000 },
+        ],
+      },
+      income: {
+        employment: {
+          annualGrossIncome: 150000,
+          effectiveTaxRate: 0.25,
+        },
+        retirementIncomes: [],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: {
+          earlyWithdrawalPenaltyRate: 0.10,
+          hsaEarlyPenaltyRate: 0.20,
+          enableRule55: false,
+        },
+        accumulationSurplusHandling: 'route_to_account',
+        accumulationSurplusAccountType: 'taxable',
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const year1 = projections[0];
+
+    // Net income = 150000 - 37500 = 112500; expense = 50000; surplus = 62500
+    expect(year1.taxableBalance).toBe(162500);
+    expect(year1.withdrawalSource).toBe('N/A');
+  });
 });
 
 // ==================== Achievable FI Age ====================
@@ -1096,6 +1141,58 @@ describe('Achievable FI Age', () => {
     expect(result.fiAtCurrentAge).toBe(true);
     expect(result.achievableFIAge).toBe(45);
     expect(result.yearsUntilFI).toBe(0);
+  });
+
+  it('uses terminal balance target to select FI age closest to depletion goal', () => {
+    const baseState = createTestState({
+      profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 55, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'cash-1', name: 'Cash', type: 'cash', owner: 'self', balance: 1000000 },
+        ],
+      },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0,
+        },
+        retirementIncomes: [],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: {
+          earlyWithdrawalPenaltyRate: 0.10,
+          hsaEarlyPenaltyRate: 0.20,
+          enableRule55: false,
+        },
+        terminalBalanceTarget: 0,
+      },
+    });
+
+    const zeroTarget = calculateAchievableFIAge(baseState);
+    expect(zeroTarget.achievableFIAge).toBe(45);
+
+    const targetState = createTestState({
+      ...baseState,
+      assumptions: {
+        ...baseState.assumptions,
+        terminalBalanceTarget: 600000,
+      },
+    });
+
+    const customTarget = calculateAchievableFIAge(targetState);
+    expect(customTarget.achievableFIAge).toBe(49);
+    expect(customTarget.achievableFIAge).toBeGreaterThan(zeroTarget.achievableFIAge!);
   });
 
   it('returns not_achievable when FI is impossible', () => {
@@ -1183,6 +1280,44 @@ describe('Achievable FI Age', () => {
     if (noEmploymentResult.achievableFIAge !== null && withEmploymentResult.achievableFIAge !== null) {
       expect(withEmploymentResult.achievableFIAge).toBeLessThanOrEqual(noEmploymentResult.achievableFIAge);
     }
+  });
+});
+
+describe('Shortfall Detection', () => {
+  it('flags shortfall when gross withdrawal exceeds gap but net is still insufficient', () => {
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 50, lifeExpectancy: 55, state: 'CA', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'trad-1', name: 'Traditional', type: 'traditional', owner: 'self', balance: 110000 },
+        ],
+      },
+      income: { retirementIncomes: [] },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 100000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['traditional', 'taxable', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: {
+          earlyWithdrawalPenaltyRate: 0.10,
+          hsaEarlyPenaltyRate: 0.20,
+          enableRule55: false,
+        },
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    expect(projections[0].withdrawal).toBeGreaterThan(projections[0].gap);
+    expect(projections[0].unmetNeed).toBeGreaterThan(0);
+    expect(projections[0].isShortfall).toBe(true);
   });
 });
 
@@ -1281,5 +1416,288 @@ describe('Summary Calculations', () => {
     const summary = calculateSummary(state, projections);
 
     expect(summary.currentNetWorth).toBe(1000000);
+  });
+});
+
+// ==================== FI Phase Return Rate ====================
+
+describe('FI Phase Return Rate', () => {
+  it('applies fiPhaseReturn during FI phase and investmentReturn during accumulation', () => {
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 1000000, costBasis: 600000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0.08,
+        fiPhaseReturn: 0.03,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // During accumulation (age 50-54), growth should use 8%
+    const accumYear = projections.find(p => p.age === 50);
+    expect(accumYear?.phase).toBe('accumulating');
+
+    // During FI (age 55+), growth should use 3%
+    const fiYear = projections.find(p => p.age === 55);
+    expect(fiYear?.phase).toBe('fi');
+
+    // With 8% accumulation vs 3% FI, terminal wealth should be much lower than all-8%
+    const stateAllHigh = createTestState({
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 1000000, costBasis: 600000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0.08,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+    const projectionsAllHigh = calculateProjection(stateAllHigh);
+    const lastFIPhase = projections[projections.length - 1];
+    const lastAllHigh = projectionsAllHigh[projectionsAllHigh.length - 1];
+    expect(lastFIPhase.totalNetWorth).toBeLessThan(lastAllHigh.totalNetWorth);
+  });
+
+  it('falls back to investmentReturn when fiPhaseReturn is undefined', () => {
+    const baseAssumptions = {
+      investmentReturn: 0.06,
+      inflationRate: 0,
+      traditionalTaxRate: 0.22,
+      capitalGainsTaxRate: 0.15,
+      rothTaxRate: 0,
+      withdrawalOrder: ['taxable' as const, 'traditional' as const, 'roth' as const],
+      safeWithdrawalRate: 0.04,
+      penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+    };
+
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 1000000, costBasis: 600000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, category: 'living' }],
+      },
+      assumptions: { ...baseAssumptions, fiPhaseReturn: undefined },
+    });
+
+    // With undefined fiPhaseReturn, should behave identically to explicit 6%
+    const stateExplicit = createTestState({
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 70, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 1000000, costBasis: 600000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, category: 'living' }],
+      },
+      assumptions: { ...baseAssumptions, fiPhaseReturn: 0.06 },
+    });
+
+    const projections = calculateProjection(state);
+    const projectionsExplicit = calculateProjection(stateExplicit);
+
+    // Terminal net worth should be identical
+    expect(projections[projections.length - 1].totalNetWorth)
+      .toBeCloseTo(projectionsExplicit[projectionsExplicit.length - 1].totalNetWorth, 2);
+  });
+
+  it('lower FI return reduces surplus at life expectancy', () => {
+    const baseState = createTestState({
+      profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 90, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 2000000, costBasis: 1200000 },
+        ],
+      },
+      socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67, colaRate: 0.02 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, category: 'living' }],
+      },
+    });
+
+    // At 6% uniform return
+    const projections6 = calculateProjection(baseState);
+    const summary6 = calculateSummary(baseState, projections6);
+
+    // At 4% FI return
+    const state4 = createTestState({
+      profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 90, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 2000000, costBasis: 1200000 },
+        ],
+      },
+      socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67, colaRate: 0.02 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0.06,
+        fiPhaseReturn: 0.04,
+        inflationRate: 0.03,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    });
+    const projections4 = calculateProjection(state4);
+    const summary4 = calculateSummary(state4, projections4);
+
+    // 4% FI return should produce significantly lower surplus
+    expect(summary4.surplusAtLE!).toBeLessThan(summary6.surplusAtLE!);
+  });
+
+  it('lower FI return can shift achievable FI age later', () => {
+    const baseOpts = {
+      profile: { currentAge: 40, targetFIAge: 50, lifeExpectancy: 90, state: 'TX' as const, filingStatus: 'single' as const },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable' as const, owner: 'self' as const, balance: 800000, costBasis: 500000 },
+          { id: 'trad-1', name: 'Traditional', type: 'traditional' as const, owner: 'self' as const, balance: 400000 },
+        ],
+      },
+      income: {
+        employment: { annualGrossIncome: 150000, effectiveTaxRate: 0.25 },
+        retirementIncomes: [],
+      },
+      socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67 as const, colaRate: 0.02 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, category: 'living' as const }],
+      },
+    };
+
+    // Achievable FI age at uniform 6%
+    const result6 = calculateAchievableFIAge(createTestState(baseOpts));
+
+    // Achievable FI age at 3% FI return
+    const result3 = calculateAchievableFIAge(createTestState({
+      ...baseOpts,
+      assumptions: {
+        investmentReturn: 0.06,
+        fiPhaseReturn: 0.03,
+        inflationRate: 0.03,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    }));
+
+    // Lower FI return should require working longer (or at minimum the same)
+    expect(result3.achievableFIAge).toBeGreaterThanOrEqual(result6.achievableFIAge!);
+  });
+
+  it('what-if returnAdjustment affects accumulation but not FI return', () => {
+    const baseOpts = {
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 70, state: 'TX' as const, filingStatus: 'single' as const },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable' as const, owner: 'self' as const, balance: 1000000, costBasis: 600000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67 as const, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 30000, category: 'living' as const }],
+      },
+      assumptions: {
+        investmentReturn: 0.06,
+        fiPhaseReturn: 0.03,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable' as const, 'traditional' as const, 'roth' as const],
+        safeWithdrawalRate: 0.04,
+        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      },
+    };
+
+    const state = createTestState(baseOpts);
+
+    // With what-if slider boosting return to 10%
+    const whatIf = { spendingAdjustment: 0, returnAdjustment: 0.10, ssStartAge: 67 as const };
+    const projections = calculateProjection(state, whatIf);
+
+    // Without what-if but with 10% accumulation, 3% FI
+    const stateHighAccum = createTestState({
+      ...baseOpts,
+      assumptions: { ...baseOpts.assumptions, investmentReturn: 0.10 },
+    });
+    const projectionsHighAccum = calculateProjection(stateHighAccum);
+
+    // Terminal values should be very close — what-if changes accumulation to 10%, FI stays at 3%
+    expect(projections[projections.length - 1].totalNetWorth)
+      .toBeCloseTo(projectionsHighAccum[projectionsHighAccum.length - 1].totalNetWorth, 0);
+  });
+
+  it('summary includes surplus and bottleneck fields', () => {
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 80, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 1500000, costBasis: 900000 },
+        ],
+      },
+      socialSecurity: { include: true, monthlyBenefit: 2500, startAge: 67, colaRate: 0.02 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, category: 'living' }],
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const summary = calculateSummary(state, projections);
+
+    // surplusAtLE should be defined and match the last projection's net worth
+    expect(summary.surplusAtLE).toBeDefined();
+    expect(summary.surplusAtLE).toBe(projections[projections.length - 1].totalNetWorth);
+
+    // bottleneckAge/Balance should be defined (there are FI years)
+    expect(summary.bottleneckAge).toBeDefined();
+    expect(summary.bottleneckBalance).toBeDefined();
+
+    // Bottleneck balance should be <= all FI year balances
+    const fiProjections = projections.filter(p => p.phase === 'fi');
+    for (const p of fiProjections) {
+      expect(summary.bottleneckBalance).toBeLessThanOrEqual(p.totalNetWorth);
+    }
   });
 });
