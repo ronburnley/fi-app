@@ -153,6 +153,14 @@ export function IncomeStep() {
                   min={0}
                   max={60}
                 />
+                <PercentInput
+                  label="Annual Raise"
+                  value={selfEmployment.annualGrowthRate ?? 0}
+                  onChange={(v) => updateSelfField('annualGrowthRate', v)}
+                  hint="Expected annual salary growth"
+                  min={0}
+                  max={20}
+                />
               </div>
             )}
           </div>
@@ -181,6 +189,14 @@ export function IncomeStep() {
                     hint="Combined fed + state"
                     min={0}
                     max={60}
+                  />
+                  <PercentInput
+                    label="Spouse Annual Raise"
+                    value={spouseEmployment.annualGrowthRate ?? 0}
+                    onChange={(v) => updateSpouseField('annualGrowthRate', v)}
+                    hint="Expected annual salary growth"
+                    min={0}
+                    max={20}
                   />
                 </div>
               )}

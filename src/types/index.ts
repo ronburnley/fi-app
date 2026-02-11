@@ -145,6 +145,7 @@ export interface LifeEvent {
 export interface EmploymentIncome {
   annualGrossIncome: number;      // Pre-tax salary
   effectiveTaxRate: number;       // Combined fed+state (decimal, e.g., 0.25)
+  annualGrowthRate?: number;      // Annual raise rate (decimal, e.g., 0.03 = 3%). Defaults to 0.
 }
 
 // Retirement income streams beyond SS/pension (consulting, rentals, etc.)

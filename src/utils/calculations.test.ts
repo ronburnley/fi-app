@@ -306,6 +306,150 @@ describe('Employment Income Calculations', () => {
     const spouseStopProjection = projections[8]; // age 53
     expect(spouseStopProjection.employmentIncome).toBe(0);
   });
+
+  it('applies growth rate annually', () => {
+    const state = createTestState({
+      profile: { currentAge: 40, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.25,
+          annualGrowthRate: 0.03,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Year 0 (age 40): base salary
+    expect(projections[0].employmentIncome).toBeCloseTo(100000, 0);
+    // Year 1 (age 41): 100000 * 1.03 = 103000
+    expect(projections[1].employmentIncome).toBeCloseTo(103000, 0);
+    // Year 5 (age 45): 100000 * 1.03^5 = 115927.41
+    expect(projections[5].employmentIncome).toBeCloseTo(115927.41, 0);
+  });
+
+  it('defaults to no growth when annualGrowthRate is undefined', () => {
+    const state = createTestState({
+      profile: { currentAge: 40, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.25,
+          // annualGrowthRate is undefined
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Static salary at all years
+    expect(projections[0].employmentIncome).toBe(100000);
+    expect(projections[5].employmentIncome).toBe(100000);
+    expect(projections[10].employmentIncome).toBe(100000);
+  });
+
+  it('stops income growth at FI age', () => {
+    const state = createTestState({
+      profile: { currentAge: 50, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.25,
+          annualGrowthRate: 0.05,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Age 54 (last working year): 100000 * 1.05^4 = 121550.63
+    expect(projections[4].employmentIncome).toBeCloseTo(121550.63, 0);
+    // Age 55 (FI): no income
+    expect(projections[5].employmentIncome).toBe(0);
+    expect(projections[5].employmentTax).toBe(0);
+  });
+
+  it('supports independent growth rates for primary and spouse', () => {
+    const state = createTestState({
+      profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 95, state: 'TX', filingStatus: 'married', spouseAge: 43 },
+      income: {
+        employment: {
+          annualGrossIncome: 150000,
+          effectiveTaxRate: 0.25,
+          annualGrowthRate: 0.03,
+        },
+        spouseEmployment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.22,
+          annualGrowthRate: 0.05,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Year 0 (age 45): 150000 + 100000 = 250000
+    expect(projections[0].employmentIncome).toBeCloseTo(250000, 0);
+    // Year 5 (age 50): 150000*1.03^5 + 100000*1.05^5 = 173891.14 + 127628.16 = 301519.29
+    expect(projections[5].employmentIncome).toBeCloseTo(301519.29, 0);
+  });
+
+  it('calculates tax on grown income', () => {
+    const state = createTestState({
+      profile: { currentAge: 40, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.25,
+          annualGrowthRate: 0.03,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projections = calculateProjection(state);
+
+    // Year 5 (age 45): gross = 100000 * 1.03^5 = 115927.41, tax = 115927.41 * 0.25 = 28981.85
+    expect(projections[5].employmentTax).toBeCloseTo(28981.85, 0);
+  });
+
+  it('treats zero growth rate same as undefined', () => {
+    const stateZero = createTestState({
+      profile: { currentAge: 40, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.25,
+          annualGrowthRate: 0,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const stateUndefined = createTestState({
+      profile: { currentAge: 40, targetFIAge: 55, lifeExpectancy: 95, state: 'CA', filingStatus: 'single' },
+      income: {
+        employment: {
+          annualGrossIncome: 100000,
+          effectiveTaxRate: 0.25,
+        },
+        retirementIncomes: [],
+      },
+    });
+
+    const projectionsZero = calculateProjection(stateZero);
+    const projectionsUndefined = calculateProjection(stateUndefined);
+
+    for (let i = 0; i < 10; i++) {
+      expect(projectionsZero[i].employmentIncome).toBe(projectionsUndefined[i].employmentIncome);
+      expect(projectionsZero[i].employmentTax).toBe(projectionsUndefined[i].employmentTax);
+    }
+  });
 });
 
 // ==================== Phase Determination ====================

@@ -42,22 +42,29 @@ export function calculateEmploymentIncome(
   spouseEmployment: EmploymentIncome | undefined,
   filingStatus: 'single' | 'married',
   fiAge: number,
-  spouseAdditionalWorkYears: number = 0
+  spouseAdditionalWorkYears: number = 0,
+  currentAge: number = selfAge
 ): EmploymentIncomeResult {
   let grossIncome = 0;
   let tax = 0;
 
   // Self employment income: stops at FI age
   if (selfEmployment && selfAge < fiAge) {
-    grossIncome += selfEmployment.annualGrossIncome;
-    tax += selfEmployment.annualGrossIncome * selfEmployment.effectiveTaxRate;
+    const growthRate = selfEmployment.annualGrowthRate ?? 0;
+    const yearsSinceStart = selfAge - currentAge;
+    const grownGross = selfEmployment.annualGrossIncome * Math.pow(1 + growthRate, yearsSinceStart);
+    grossIncome += grownGross;
+    tax += grownGross * selfEmployment.effectiveTaxRate;
   }
 
   // Spouse employment income: stops at fiAge + spouseAdditionalWorkYears (on primary's calendar)
   const spouseStopAge = fiAge + spouseAdditionalWorkYears;
   if (filingStatus === 'married' && spouseEmployment && spouseAge !== undefined && selfAge < spouseStopAge) {
-    grossIncome += spouseEmployment.annualGrossIncome;
-    tax += spouseEmployment.annualGrossIncome * spouseEmployment.effectiveTaxRate;
+    const growthRate = spouseEmployment.annualGrowthRate ?? 0;
+    const yearsSinceStart = selfAge - currentAge;
+    const grownGross = spouseEmployment.annualGrossIncome * Math.pow(1 + growthRate, yearsSinceStart);
+    grossIncome += grownGross;
+    tax += grownGross * spouseEmployment.effectiveTaxRate;
   }
 
   const netIncome = grossIncome - tax;

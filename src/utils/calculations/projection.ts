@@ -50,7 +50,8 @@ export function calculateProjection(
       income.spouseEmployment,
       profile.filingStatus,
       effectiveFIAge,
-      spouseAdditionalWorkYears
+      spouseAdditionalWorkYears,
+      profile.currentAge
     );
 
     // Calculate expenses - always needed (even during working years for tracking)
