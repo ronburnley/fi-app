@@ -75,7 +75,7 @@ export function WhatIfSection() {
 
         <Slider
           label="Investment Return"
-          value={whatIf.returnAdjustment}
+          value={whatIf.returnAdjustment ?? state.assumptions.investmentReturn}
           onChange={(value) => setWhatIf({ ...whatIf, returnAdjustment: value })}
           min={0.02}
           max={0.12}

@@ -142,7 +142,6 @@ export const DEFAULT_STATE: AppState = {
 
 export const DEFAULT_WHAT_IF: WhatIfAdjustments = {
   spendingAdjustment: 0,
-  returnAdjustment: 0.06,
   ssStartAge: 67,
 };
 

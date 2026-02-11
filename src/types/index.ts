@@ -230,7 +230,7 @@ export interface ProjectionSummary {
 
 export interface WhatIfAdjustments {
   spendingAdjustment: number; // -0.2 to +0.2
-  returnAdjustment: number; // override investment return
+  returnAdjustment?: number; // undefined = use assumptions value
   ssStartAge: 62 | 67 | 70;
   spouseSSStartAge?: 62 | 67 | 70;
 }
