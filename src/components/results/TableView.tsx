@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useProjection } from '../../hooks/useProjection';
+import { useProjectionContext } from '../../context/ProjectionContext';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/formatters';
 import type { FinancialPhase } from '../../types';
@@ -12,7 +12,7 @@ const PHASE_CONFIG: Record<FinancialPhase, { label: string; color: string; bg: s
 
 export function TableView() {
   const { state } = useApp();
-  const { projections } = useProjection();
+  const { projections } = useProjectionContext();
   // Default to showing all years to see the full timeline
   const [showAllYears, setShowAllYears] = useState(true);
 

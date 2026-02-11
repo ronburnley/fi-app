@@ -1,12 +1,10 @@
-import { useProjection } from '../../hooks/useProjection';
+import { useProjectionContext } from '../../context/ProjectionContext';
 import { useApp } from '../../context/AppContext';
-import { useAchievableFI } from '../../hooks/useAchievableFI';
 import { formatCurrency } from '../../utils/formatters';
 
 export function SummaryMetrics() {
   const { state } = useApp();
-  const { summary } = useProjection();
-  const achievableFI = useAchievableFI();
+  const { summary, achievableFI } = useProjectionContext();
 
   const isOnTrack = summary.gap >= 0;
   const hasBuffer = achievableFI.bufferYears >= 0;

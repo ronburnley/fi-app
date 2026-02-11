@@ -145,9 +145,9 @@ export function calculateProjection(
     let gap = 0;
 
     // Step 3: Determine if there's a deficit requiring withdrawals
-    // Employment income covers expenses; surplus is untracked (ignored)
+    // Employment income covers expenses and contributions; surplus is untracked (ignored)
     const allIncome = employmentResult.netIncome + totalIncome;
-    const deficit = yearExpenses - allIncome;
+    const deficit = yearExpenses + yearContributions - allIncome;
 
     if (deficit > 0) {
       gap = deficit;
@@ -192,7 +192,7 @@ export function calculateProjection(
       phase,
       expenses: yearExpenses,
       income: totalIncome,
-      employmentIncome: employmentResult.netIncome,
+      employmentIncome: employmentResult.grossIncome,
       employmentTax: employmentResult.tax,
       contributions: yearContributions,
       retirementIncome: retirementIncomeStreams,

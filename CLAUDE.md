@@ -31,10 +31,9 @@ There is no "gap" phase. FI age = when employment stops.
 |------|---------|
 | `src/types/index.ts` | All TypeScript interfaces (source of truth for data model) |
 | `src/utils/calculations/` | Projection engine split into 10 modules (types, mortgage, socialSecurity, withdrawals, balances, expenses, projection, summary, fiSearch, index) |
-| `src/utils/calculations.test.ts` | 47 unit tests (Vitest) |
+| `src/utils/calculations.test.ts` | 50 unit tests (Vitest) |
 | `src/utils/calculations.integration.test.ts` | 16 integration tests (multi-system scenarios) |
-| `src/hooks/useProjection.ts` | Memoized projection hook |
-| `src/hooks/useAchievableFI.ts` | Binary search for earliest FI age |
+| `src/context/ProjectionContext.tsx` | Centralized projection, summary, and achievable FI computation |
 | `src/context/AppContext.tsx` | Global state, Supabase sync, migrations |
 | `src/context/AuthContext.tsx` | Supabase auth, guest mode |
 | `src/utils/migration.ts` | Legacy data format migrations |
@@ -140,6 +139,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v7.5 | 2026-02-11 | **Centralized Projections + Calculation Fixes** — Created `ProjectionContext` to compute projections, summary, and achievable FI age once (was 3-4x redundant via per-component hooks). Deleted `useProjection` and `useAchievableFI` hooks. Fixed: timeline now shows gross employment income (was net). Fixed: contributions included in gap/deficit calculation. Fixed: targetFIAge sync when FI not achievable (sets to lifeExpectancy-1). 66 tests. |
 | v7.4 | 2026-02-11 | **Empty Defaults for New Users** — Cleared pre-populated demo data from assets (5 accounts, $1.6M) and expenses (7 categories, $53.8K/yr, full mortgage). New users now start with a completely blank slate. Existing users unaffected (saved data loads over defaults). 66 tests. |
 | v7.3 | 2026-02-09 | **Employment Tax in Timeline** — Added `employmentTax` field to `YearProjection` and "Emp. Tax" column to timeline table. Tax deducted from gross employment income is now visible during accumulation years. 66 tests (50 unit + 16 integration). |
 | v7.2 | 2026-02-09 | **Penalty Gross-Up Fix** — Withdrawal gross-up now includes penalty rates in the denominator (Traditional, Roth, HSA). Previously, penalties were calculated but not funded by the withdrawal amount, making projections overly optimistic. 66 tests (50 unit + 16 integration). |

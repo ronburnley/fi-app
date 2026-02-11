@@ -19,7 +19,6 @@ import {
   needsInflationMigration,
   migrateInflation,
 } from '../utils/migration';
-import { calculateAchievableFIAge } from '../utils/calculations';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
 import type { FinancialPlan } from '../types';
@@ -374,13 +373,8 @@ export function AppProvider({ children }: AppProviderProps) {
   const [planId, setPlanId] = useState<string | null>(null);
   const [needsMigration, setNeedsMigration] = useState(false);
   const [localDataToMigrate, setLocalDataToMigrate] = useState<string | null>(null);
-  const lastCalculatedFIAge = useRef<number | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isInitialLoad = useRef(true);
-
-  // Extract values for dependency tracking
-  const { assets, income, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
-  const { currentAge, lifeExpectancy, filingStatus, spouseAge, state: profileState, targetFIAge } = profile;
 
   // Load plan from Supabase (or localStorage in dev bypass/guest mode)
   useEffect(() => {
@@ -539,39 +533,6 @@ export function AppProvider({ children }: AppProviderProps) {
       console.error('Failed to create plan:', err);
     }
   }, [user]);
-
-  // Sync targetFIAge with calculated achievable FI age
-  useEffect(() => {
-    const result = calculateAchievableFIAge(state, whatIf);
-
-    // Only update targetFIAge when FI is achievable.
-    // When not achievable, keep the last valid targetFIAge (avoids forcing employment to run to lifeExpectancy - 1).
-    if (result.achievableFIAge !== null) {
-      const newFIAge = result.achievableFIAge;
-      if (lastCalculatedFIAge.current !== newFIAge && targetFIAge !== newFIAge) {
-        lastCalculatedFIAge.current = newFIAge;
-        dispatch({
-          type: 'UPDATE_PROFILE',
-          payload: { targetFIAge: newFIAge },
-        });
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    assets,
-    income,
-    expenses,
-    socialSecurity,
-    assumptions,
-    lifeEvents,
-    currentAge,
-    lifeExpectancy,
-    filingStatus,
-    spouseAge,
-    profileState,
-    targetFIAge,
-    whatIf,
-  ]);
 
   // Auto-save to Supabase (or localStorage in dev bypass/guest mode) when state changes
   useEffect(() => {

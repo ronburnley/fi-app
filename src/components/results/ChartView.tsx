@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { useProjection } from '../../hooks/useProjection';
+import { useProjectionContext } from '../../context/ProjectionContext';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -62,7 +62,7 @@ function CustomTooltip({ active, payload, label }: {
 
 export function ChartView() {
   const { state, whatIf } = useApp();
-  const { projections, summary } = useProjection();
+  const { projections, summary } = useProjectionContext();
 
   // Transform projections for chart
   const chartData: ChartDataPoint[] = projections.map((p) => ({

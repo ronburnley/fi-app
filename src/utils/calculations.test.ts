@@ -212,9 +212,8 @@ describe('Employment Income Calculations', () => {
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Net = Gross - Tax
-    // Net = 150000 - 37500 = 112500
-    expect(year1.employmentIncome).toBe(112500);
+    // Gross employment income
+    expect(year1.employmentIncome).toBe(150000);
     expect(year1.employmentTax).toBe(37500);
     expect(year1.phase).toBe('accumulating');
   });
@@ -237,10 +236,8 @@ describe('Employment Income Calculations', () => {
     const projections = calculateProjection(state);
     const year1 = projections[0];
 
-    // Self: Net = 150000 - 37500 = 112500
-    // Spouse: Net = 100000 - 22000 = 78000
-    // Combined Net = 190500
-    expect(year1.employmentIncome).toBe(190500);
+    // Self: 150000, Spouse: 100000, Combined Gross = 250000
+    expect(year1.employmentIncome).toBe(250000);
     // Combined Tax = 37500 + 22000 = 59500
     expect(year1.employmentTax).toBe(59500);
   });
@@ -260,11 +257,11 @@ describe('Employment Income Calculations', () => {
     const projections = calculateProjection(state);
 
     // Age 50-54: Still accumulating, employment active
-    // Net = 150000 - 37500 = 112500
-    expect(projections[0].employmentIncome).toBe(112500);
+    // Gross = 150000, Tax = 37500
+    expect(projections[0].employmentIncome).toBe(150000);
     expect(projections[0].employmentTax).toBe(37500);
     expect(projections[0].phase).toBe('accumulating');
-    expect(projections[4].employmentIncome).toBe(112500);
+    expect(projections[4].employmentIncome).toBe(150000);
 
     // Age 55: FI — no employment
     expect(projections[5].employmentIncome).toBe(0);

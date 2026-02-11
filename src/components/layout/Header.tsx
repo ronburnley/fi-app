@@ -4,13 +4,13 @@ import { SignInModal } from '../auth';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWizard } from '../wizard/WizardContext';
-import { useAchievableFI } from '../../hooks/useAchievableFI';
+import { useProjectionContext } from '../../context/ProjectionContext';
 
 export function Header() {
   const { syncStatus } = useApp();
   const { user, signOut, isGuest } = useAuth();
   const { currentStep } = useWizard();
-  const achievableFI = useAchievableFI();
+  const { achievableFI } = useProjectionContext();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);

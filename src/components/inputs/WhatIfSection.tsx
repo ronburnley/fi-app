@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Card, Slider, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
-import { useAchievableFI } from '../../hooks/useAchievableFI';
+import { useProjectionContext } from '../../context/ProjectionContext';
 import { getAdjustedSSBenefit } from '../../utils/calculations';
 import type { Expenses } from '../../types';
 
@@ -39,7 +39,7 @@ function calculateBaseAnnualSpending(expenses: Expenses, currentYear: number): n
 
 export function WhatIfSection() {
   const { state, whatIf, setWhatIf } = useApp();
-  const achievableFI = useAchievableFI();
+  const { achievableFI } = useProjectionContext();
 
   const currentYear = new Date().getFullYear();
   const baseAnnualSpending = useMemo(

@@ -1,5 +1,6 @@
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
+import { ProjectionProvider } from './context/ProjectionContext';
 import { Header } from './components/layout';
 import { WizardProvider, WizardLayout } from './components/wizard';
 import { LoginPage } from './components/auth';
@@ -37,12 +38,14 @@ function AppContent() {
 
   // Show main app
   return (
-    <WizardProvider>
-      <div className="flex flex-col min-h-screen bg-bg-primary">
-        <Header />
-        <WizardLayout />
-      </div>
-    </WizardProvider>
+    <ProjectionProvider>
+      <WizardProvider>
+        <div className="flex flex-col min-h-screen bg-bg-primary">
+          <Header />
+          <WizardLayout />
+        </div>
+      </WizardProvider>
+    </ProjectionProvider>
   );
 }
 

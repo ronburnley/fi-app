@@ -263,25 +263,23 @@ describe('Integration Tests', () => {
       const projections = calculateProjection(state);
 
       // Age 48 (index 0): Both working, accumulating phase
-      // Self: 150000 - 37500 = 112500
-      // Spouse: 100000 - 22000 = 78000
-      // Combined net: 190500
+      // Self gross: 150000, Spouse gross: 100000, Combined gross: 250000
       expect(projections[0].phase).toBe('accumulating');
-      expect(projections[0].employmentIncome).toBe(190500);
+      expect(projections[0].employmentIncome).toBe(250000);
 
       // Age 49 (index 1): Both still working
       expect(projections[1].phase).toBe('accumulating');
-      expect(projections[1].employmentIncome).toBe(190500);
+      expect(projections[1].employmentIncome).toBe(250000);
 
       // Age 50 (index 2): Primary stops (FI), spouse continues
       // spouseAdditionalWorkYears = 3, so spouse works while primary's age < 50 + 3 = 53
       // At age 50, primary employment = 0, spouse still employed
-      // Spouse net: 100000 - 22000 = 78000
+      // Spouse gross: 100000
       expect(projections[2].phase).toBe('fi');
-      expect(projections[2].employmentIncome).toBe(78000);
+      expect(projections[2].employmentIncome).toBe(100000);
 
       // Age 52 (index 4): Spouse still working (52 < 53 cutoff on primary's calendar)
-      expect(projections[4].employmentIncome).toBe(78000);
+      expect(projections[4].employmentIncome).toBe(100000);
 
       // Age 53 (index 5): Spouse stops (primary age 53 >= FI age 50 + 3)
       // The engine checks selfAge < spouseStopAge (53), so at age 53, 53 < 53 is false
