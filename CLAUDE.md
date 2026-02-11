@@ -140,6 +140,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v7.4 | 2026-02-11 | **Empty Defaults for New Users** — Cleared pre-populated demo data from assets (5 accounts, $1.6M) and expenses (7 categories, $53.8K/yr, full mortgage). New users now start with a completely blank slate. Existing users unaffected (saved data loads over defaults). 66 tests. |
 | v7.3 | 2026-02-09 | **Employment Tax in Timeline** — Added `employmentTax` field to `YearProjection` and "Emp. Tax" column to timeline table. Tax deducted from gross employment income is now visible during accumulation years. 66 tests (50 unit + 16 integration). |
 | v7.2 | 2026-02-09 | **Penalty Gross-Up Fix** — Withdrawal gross-up now includes penalty rates in the denominator (Traditional, Roth, HSA). Previously, penalties were calculated but not funded by the withdrawal amount, making projections overly optimistic. 66 tests (50 unit + 16 integration). |
 | v7.1 | 2026-02-08 | **Simplified Inflation** — Single global inflation rate for all expenses. Replaced per-expense `inflationRate: number` with `inflationAdjusted?: boolean` (default true, false = fixed cost). Removed `HomeExpense.inflationRate`. UI: checkbox toggle replaces PercentInput, "Fixed" badge on expense rows. Migration converts legacy data. 63 tests. |

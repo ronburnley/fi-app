@@ -1,5 +1,4 @@
-import type { AppState, WhatIfAdjustments, Asset, Expense, ExpenseCategory, Income } from '../types';
-import { generateId } from '../utils/migration';
+import type { AppState, WhatIfAdjustments, Asset, ExpenseCategory, Income } from '../types';
 
 // Expense category display names
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
@@ -19,39 +18,6 @@ export const EXPENSE_CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   other: '#a1a1aa',        // zinc-400
 };
 
-// Helper to create default expenses
-function createDefaultExpense(
-  name: string,
-  category: ExpenseCategory,
-  annualAmount: number,
-  options?: Partial<Omit<Expense, 'id' | 'name' | 'category' | 'annualAmount'>>
-): Expense {
-  return {
-    id: generateId(),
-    name,
-    category,
-    annualAmount,
-    ...options,
-  };
-}
-
-// Helper to create default assets
-function createDefaultAsset(
-  name: string,
-  type: Asset['type'],
-  balance: number,
-  options?: Partial<Omit<Asset, 'id' | 'name' | 'type' | 'balance'>>
-): Asset {
-  return {
-    id: generateId(),
-    name,
-    type,
-    owner: options?.owner ?? 'self',
-    balance,
-    ...options,
-  };
-}
-
 // Default income state (empty - user optionally adds employment/retirement income)
 export const DEFAULT_INCOME: Income = {
   employment: undefined,
@@ -68,21 +34,8 @@ export const DEFAULT_STATE: AppState = {
     filingStatus: 'single',
   },
   assets: {
-    accounts: [
-      createDefaultAsset('Taxable Brokerage', 'taxable', 500000, {
-        owner: 'joint',
-        costBasis: 300000,
-      }),
-      createDefaultAsset('Traditional 401(k)', 'traditional', 800000, {
-        is401k: true,
-      }),
-      createDefaultAsset('Roth IRA', 'roth', 200000),
-      createDefaultAsset('HSA', 'hsa', 50000),
-      createDefaultAsset('Cash / Emergency Fund', 'cash', 50000, {
-        owner: 'joint',
-      }),
-    ],
-    homeEquity: 400000,
+    accounts: [],
+    homeEquity: undefined,
     pension: undefined,
   },
   income: DEFAULT_INCOME,
@@ -98,29 +51,8 @@ export const DEFAULT_STATE: AppState = {
     },
   },
   expenses: {
-    categories: [
-      createDefaultExpense('Groceries & Household', 'living', 12000),
-      createDefaultExpense('Utilities', 'living', 4800),
-      createDefaultExpense('Transportation', 'living', 6000),
-      createDefaultExpense('Health Insurance', 'healthcare', 12000),
-      createDefaultExpense('Medical Expenses', 'healthcare', 3000),
-      createDefaultExpense('Travel & Entertainment', 'discretionary', 10000),
-      createDefaultExpense('Dining Out', 'discretionary', 6000),
-    ],
-    home: {
-      mortgage: {
-        homeValue: 650000,
-        loanBalance: 400000,
-        interestRate: 0.065,
-        loanTermYears: 30,
-        originationYear: 2020,
-        monthlyPayment: 2528, // Calculated from the above
-        manualPaymentOverride: false,
-        earlyPayoff: undefined,
-      },
-      propertyTax: 8000,
-      insurance: 2400,
-    },
+    categories: [],
+    home: undefined,
   },
   lifeEvents: [],
   assumptions: {
