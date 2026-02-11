@@ -4,9 +4,10 @@ import { useWizard } from './WizardContext';
 interface WizardNavigationProps {
   onValidate?: () => boolean;
   showSkip?: boolean;
+  disabled?: boolean;
 }
 
-export function WizardNavigation({ onValidate, showSkip = false }: WizardNavigationProps) {
+export function WizardNavigation({ onValidate, showSkip = false, disabled = false }: WizardNavigationProps) {
   const { currentStep, nextStep, prevStep, canGoBack, isLastStep } = useWizard();
 
   const handleNext = () => {
@@ -45,7 +46,7 @@ export function WizardNavigation({ onValidate, showSkip = false }: WizardNavigat
             Skip
           </Button>
         )}
-        <Button onClick={handleNext}>
+        <Button onClick={handleNext} disabled={disabled}>
           {currentStep === 7 ? 'View Results' : 'Continue'}
         </Button>
       </div>

@@ -82,8 +82,9 @@ export function WelcomeStep() {
             <Input
               label="Your Age"
               type="number"
-              value={profile.currentAge}
+              value={profile.currentAge || ''}
               onChange={(e) => updateProfile('currentAge', parseInt(e.target.value) || 0)}
+              placeholder="e.g., 45"
               min={18}
               max={100}
             />
@@ -91,7 +92,7 @@ export function WelcomeStep() {
               <Input
                 label="Spouse's Age"
                 type="number"
-                value={profile.spouseAge || profile.currentAge - 2}
+                value={profile.spouseAge || ''}
                 onChange={(e) => updateProfile('spouseAge', parseInt(e.target.value) || 0)}
                 min={18}
                 max={100}
@@ -137,7 +138,10 @@ export function WelcomeStep() {
         </div>
       </div>
 
-      <WizardNavigation />
+      <WizardNavigation
+        onValidate={() => profile.currentAge > 0}
+        disabled={profile.currentAge <= 0}
+      />
     </div>
   );
 }

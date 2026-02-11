@@ -61,12 +61,11 @@ export const DEFAULT_INCOME: Income = {
 
 export const DEFAULT_STATE: AppState = {
   profile: {
-    currentAge: 45,
-    targetFIAge: 50,
+    currentAge: 0,
+    targetFIAge: 0,
     lifeExpectancy: 95,
     state: 'CA',
-    filingStatus: 'married',
-    spouseAge: 43,
+    filingStatus: 'single',
   },
   assets: {
     accounts: [
