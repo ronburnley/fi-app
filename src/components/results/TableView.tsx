@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useProjectionContext } from '../../context/ProjectionContext';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency } from '../../utils/formatters';
@@ -25,6 +25,23 @@ export function TableView() {
   // Check if there's employment income (to show employment-related columns)
   const hasEmploymentIncome = state.income.employment || state.income.spouseEmployment;
   const hasRetirementIncome = state.income.retirementIncomes.length > 0;
+
+  // Auto-hide columns that are all-zero across the entire timeline
+  const columnVisibility = useMemo(() => {
+    const has = (fn: (p: (typeof projections)[0]) => boolean) => projections.some(fn);
+    return {
+      income: has(p => p.income > 0),
+      gap: has(p => p.gap > 0),
+      withdrawal: has(p => p.withdrawal > 0),
+      federalTax: has(p => p.federalTax > 0),
+      stateTax: has(p => p.stateTax > 0),
+      penalty: has(p => p.withdrawalPenalty > 0),
+      taxable: has(p => p.taxableBalance > 0),
+      traditional: has(p => p.traditionalBalance > 0),
+      roth: has(p => p.rothBalance > 0),
+      mortgage: has(p => p.mortgageBalance !== undefined && p.mortgageBalance > 0),
+    };
+  }, [projections]);
 
   // Filter logic:
   // - "Show all years" shows everything (default now)
@@ -78,39 +95,61 @@ export function TableView() {
               <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Expenses
               </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Income
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Gap
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Withdrawal
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Fed Tax
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                State Tax
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Penalty
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-text-muted whitespace-nowrap">
-                Source
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Taxable
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Traditional
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Roth
-              </th>
-              <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                Mortgage
-              </th>
+              {columnVisibility.income && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Income
+                </th>
+              )}
+              {columnVisibility.gap && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Gap
+                </th>
+              )}
+              {columnVisibility.withdrawal && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Withdrawal
+                </th>
+              )}
+              {columnVisibility.federalTax && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Fed Tax
+                </th>
+              )}
+              {columnVisibility.stateTax && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  State Tax
+                </th>
+              )}
+              {columnVisibility.penalty && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Penalty
+                </th>
+              )}
+              {columnVisibility.withdrawal && (
+                <th className="px-4 py-2 text-left text-xs font-medium text-text-muted whitespace-nowrap">
+                  Source
+                </th>
+              )}
+              {columnVisibility.taxable && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Taxable
+                </th>
+              )}
+              {columnVisibility.traditional && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Traditional
+                </th>
+              )}
+              {columnVisibility.roth && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Roth
+                </th>
+              )}
+              {columnVisibility.mortgage && (
+                <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
+                  Mortgage
+                </th>
+              )}
               <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Net Worth
               </th>
@@ -178,45 +217,67 @@ export function TableView() {
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.expenses > 0 ? formatCurrency(projection.expenses) : '-'}
                   </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {projection.income > 0 ? formatCurrency(projection.income) : '-'}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
-                    <span className={projection.gap > 0 ? 'text-text-secondary' : 'text-text-muted'}>
-                      {projection.gap > 0 ? formatCurrency(projection.gap) : '-'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {projection.withdrawal > 0 ? formatCurrency(projection.withdrawal) : '-'}
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {projection.federalTax > 0 ? formatCurrency(projection.federalTax) : '-'}
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {projection.stateTax > 0 ? formatCurrency(projection.stateTax) : '-'}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
-                    <span className={projection.withdrawalPenalty > 0 ? 'text-accent-warning font-medium' : 'text-text-muted'}>
-                      {projection.withdrawalPenalty > 0 ? formatCurrency(projection.withdrawalPenalty) : '-'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-left text-text-muted text-xs whitespace-nowrap">
-                    {projection.withdrawal > 0 ? projection.withdrawalSource : (projection.phase === 'accumulating' && projection.contributions > 0 ? 'Contributing' : '-')}
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {formatCurrency(projection.taxableBalance)}
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {formatCurrency(projection.traditionalBalance)}
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {formatCurrency(projection.rothBalance)}
-                  </td>
-                  <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                    {projection.mortgageBalance !== undefined && projection.mortgageBalance > 0
-                      ? formatCurrency(projection.mortgageBalance)
-                      : '-'}
-                  </td>
+                  {columnVisibility.income && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {projection.income > 0 ? formatCurrency(projection.income) : '-'}
+                    </td>
+                  )}
+                  {columnVisibility.gap && (
+                    <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                      <span className={projection.gap > 0 ? 'text-text-secondary' : 'text-text-muted'}>
+                        {projection.gap > 0 ? formatCurrency(projection.gap) : '-'}
+                      </span>
+                    </td>
+                  )}
+                  {columnVisibility.withdrawal && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {projection.withdrawal > 0 ? formatCurrency(projection.withdrawal) : '-'}
+                    </td>
+                  )}
+                  {columnVisibility.federalTax && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {projection.federalTax > 0 ? formatCurrency(projection.federalTax) : '-'}
+                    </td>
+                  )}
+                  {columnVisibility.stateTax && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {projection.stateTax > 0 ? formatCurrency(projection.stateTax) : '-'}
+                    </td>
+                  )}
+                  {columnVisibility.penalty && (
+                    <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                      <span className={projection.withdrawalPenalty > 0 ? 'text-accent-warning font-medium' : 'text-text-muted'}>
+                        {projection.withdrawalPenalty > 0 ? formatCurrency(projection.withdrawalPenalty) : '-'}
+                      </span>
+                    </td>
+                  )}
+                  {columnVisibility.withdrawal && (
+                    <td className="px-4 py-2 text-left text-text-muted text-xs whitespace-nowrap">
+                      {projection.withdrawal > 0 ? projection.withdrawalSource : (projection.phase === 'accumulating' && projection.contributions > 0 ? 'Contributing' : '-')}
+                    </td>
+                  )}
+                  {columnVisibility.taxable && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {formatCurrency(projection.taxableBalance)}
+                    </td>
+                  )}
+                  {columnVisibility.traditional && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {formatCurrency(projection.traditionalBalance)}
+                    </td>
+                  )}
+                  {columnVisibility.roth && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {formatCurrency(projection.rothBalance)}
+                    </td>
+                  )}
+                  {columnVisibility.mortgage && (
+                    <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
+                      {projection.mortgageBalance !== undefined && projection.mortgageBalance > 0
+                        ? formatCurrency(projection.mortgageBalance)
+                        : '-'}
+                    </td>
+                  )}
                   <td
                     className={`px-4 py-2 text-right font-medium tabular-nums whitespace-nowrap ${
                       projection.isShortfall ? 'text-accent-danger' : 'text-text-primary'

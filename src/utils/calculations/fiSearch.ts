@@ -7,36 +7,26 @@ import type {
 import { calculateProjection } from './projection';
 
 /**
- * Test if a given FI age is viable (no shortfall before life expectancy + buffer)
+ * Test if a given FI age is viable (no shortfall before life expectancy)
  *
- * The viability test requires money to last MINIMUM_BUFFER_YEARS beyond life expectancy.
- * This ensures that large expenses (like life events) that reduce the buffer will
- * appropriately push the achievable FI age later.
+ * Tests whether money lasts through the user's actual life expectancy.
+ * The confidence level system (high/moderate/tight) communicates safety margin separately.
  */
 function testFIAge(
   state: AppState,
   fiAge: number,
   whatIf?: WhatIfAdjustments
 ): boolean {
-  // Extend life expectancy by buffer years to ensure adequate margin
-  // This means an FI age is only viable if money lasts 5 years PAST planning horizon
-  const MINIMUM_BUFFER_YEARS = 5;
-  const extendedLifeExpectancy = state.profile.lifeExpectancy + MINIMUM_BUFFER_YEARS;
-
-  // Create a modified state with the test FI age and extended life expectancy
   const testState: AppState = {
     ...state,
     profile: {
       ...state.profile,
       targetFIAge: fiAge,
-      lifeExpectancy: extendedLifeExpectancy, // Test beyond life expectancy
     },
   };
 
-  // Run projection with what-if adjustments (but no FI age adjustment)
   const projections = calculateProjection(testState, whatIf);
 
-  // Check if any year has a shortfall (now tests to lifeExpectancy + 5)
   return !projections.some((p) => p.isShortfall);
 }
 
