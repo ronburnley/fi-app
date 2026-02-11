@@ -34,8 +34,8 @@ export function IncomeStep() {
     const existing = income.employment;
     if (existing) return existing;
     return {
-      annualGrossIncome: 150000,
-      effectiveTaxRate: 0.28,
+      annualGrossIncome: 0,
+      effectiveTaxRate: 0,
     };
   });
 
@@ -43,8 +43,8 @@ export function IncomeStep() {
     const existing = income.spouseEmployment;
     if (existing) return existing;
     return {
-      annualGrossIncome: 100000,
-      effectiveTaxRate: 0.25,
+      annualGrossIncome: 0,
+      effectiveTaxRate: 0,
     };
   });
 

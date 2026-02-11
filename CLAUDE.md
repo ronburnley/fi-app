@@ -139,6 +139,7 @@ Borders: #27272a (subtle), #3f3f46 (default)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v7.7 | 2026-02-11 | **Empty Income Defaults + Live Comma Formatting** — Zeroed out pre-populated employment income defaults ($150K/$100K → $0/$0) so new users start blank, consistent with v7.4. CurrencyInput now shows comma-formatted numbers while typing (was format-on-blur only) with stable cursor positioning. 66 tests. |
 | v7.6 | 2026-02-11 | **Bundle Code Splitting** — Lazy-load all 8 wizard steps via `React.lazy` + `Suspense`. Main chunk dropped from 814 KB → 426 KB (below Vite's 500 KB warning). ResultsStep + Recharts (359 KB) deferred until step 8. Each step is its own chunk loaded on-demand. Added default exports to all step components. 66 tests. |
 | v7.5 | 2026-02-11 | **Centralized Projections + Calculation Fixes** — Created `ProjectionContext` to compute projections, summary, and achievable FI age once (was 3-4x redundant via per-component hooks). Deleted `useProjection` and `useAchievableFI` hooks. Fixed: timeline now shows gross employment income (was net). Fixed: contributions included in gap/deficit calculation. Fixed: targetFIAge sync when FI not achievable (sets to lifeExpectancy-1). 66 tests. |
 | v7.4 | 2026-02-11 | **Empty Defaults for New Users** — Cleared pre-populated demo data from assets (5 accounts, $1.6M) and expenses (7 categories, $53.8K/yr, full mortgage). New users now start with a completely blank slate. Existing users unaffected (saved data loads over defaults). 66 tests. |

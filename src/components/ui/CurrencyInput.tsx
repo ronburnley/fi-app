@@ -32,9 +32,11 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
 
     const displayValue = isFocused ? editingValue : formatCurrency(value);
 
-    const handleFocus = () => {
-      setEditingValue(value === 0 ? '' : value.toString());
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      setEditingValue(value === 0 ? '' : formatCurrency(value));
       setIsFocused(true);
+      // Select all text on focus for easy replacement
+      requestAnimationFrame(() => e.target.select());
     };
 
     const handleBlur = () => {
@@ -44,10 +46,36 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const raw = e.target.value;
-      setEditingValue(raw);
+      const input = e.target;
+      const raw = input.value;
       const parsed = parseCurrency(raw);
+
+      // Count commas before cursor in old vs new value to adjust cursor
+      const cursorPos = input.selectionStart ?? raw.length;
+      const formatted = parsed === 0 && raw === '' ? '' : formatCurrency(parsed);
+
+      const oldCommasBefore = (raw.slice(0, cursorPos).match(/,/g) || []).length;
+      const strippedCursorPos = cursorPos - oldCommasBefore;
+
+      // Find where the same stripped position lands in the formatted string
+      let newCursorPos = 0;
+      let strippedCount = 0;
+      for (let i = 0; i < formatted.length; i++) {
+        if (strippedCount === strippedCursorPos) {
+          newCursorPos = i;
+          break;
+        }
+        if (formatted[i] !== ',') strippedCount++;
+        newCursorPos = i + 1;
+      }
+
+      setEditingValue(formatted);
       onChange(parsed);
+
+      // Restore cursor position after React re-renders
+      requestAnimationFrame(() => {
+        input.setSelectionRange(newCursorPos, newCursorPos);
+      });
     };
 
     return (
