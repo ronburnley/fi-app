@@ -20,7 +20,7 @@ export function ProfileSection() {
           <Input
             label="Current Age"
             type="number"
-            value={profile.currentAge}
+            value={profile.currentAge || ''}
             onChange={(e) => updateProfile('currentAge', parseInt(e.target.value) || 0)}
             min={18}
             max={100}
@@ -28,7 +28,7 @@ export function ProfileSection() {
           <Input
             label="FI Target Age"
             type="number"
-            value={profile.targetFIAge}
+            value={profile.targetFIAge || ''}
             onChange={(e) => updateProfile('targetFIAge', parseInt(e.target.value) || 0)}
             min={profile.currentAge + 1}
             max={100}
@@ -37,7 +37,7 @@ export function ProfileSection() {
         <Input
           label="Life Expectancy"
           type="number"
-          value={profile.lifeExpectancy}
+          value={profile.lifeExpectancy || ''}
           onChange={(e) => updateProfile('lifeExpectancy', parseInt(e.target.value) || 0)}
           min={profile.targetFIAge + 1}
           max={120}

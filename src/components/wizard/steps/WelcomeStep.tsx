@@ -112,7 +112,7 @@ export function WelcomeStep() {
             <Input
               label="Life Expectancy"
               type="number"
-              value={profile.lifeExpectancy}
+              value={profile.lifeExpectancy || ''}
               onChange={(e) => updateProfile('lifeExpectancy', parseInt(e.target.value) || 0)}
               min={profile.currentAge + 1}
               max={120}
