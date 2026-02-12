@@ -71,6 +71,7 @@ export const DEFAULT_STATE: AppState = {
     terminalBalanceTarget: 0,
     accumulationSurplusHandling: 'ignore',
     accumulationSurplusAccountType: 'taxable',
+    fiPhaseReturn: 0.03,
   },
 };
 
