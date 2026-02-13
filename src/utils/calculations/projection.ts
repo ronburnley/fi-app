@@ -125,14 +125,15 @@ export function calculateProjection(
     );
 
     // Calculate passive income (SS, pension)
-    let passiveIncome = 0;
+    let ssIncome = 0;
+    let pensionIncome = 0;
 
     // Primary Social Security with COLA (monthlyBenefit is FRA amount, adjusted by claiming age)
     if (socialSecurity.include && age >= effectiveSSAge) {
       const adjustedMonthly = getAdjustedSSBenefit(socialSecurity.monthlyBenefit, effectiveSSAge);
       const yearsSinceStart = age - effectiveSSAge;
       const colaFactor = Math.pow(1 + (socialSecurity.colaRate || 0), yearsSinceStart);
-      passiveIncome += adjustedMonthly * 12 * colaFactor;
+      ssIncome += adjustedMonthly * 12 * colaFactor;
     }
 
     // Spouse Social Security with COLA (monthlyBenefit is FRA amount, adjusted by claiming age)
@@ -143,7 +144,7 @@ export function calculateProjection(
         const adjustedMonthly = getAdjustedSSBenefit(socialSecurity.spouse.monthlyBenefit, spouseSSAge);
         const yearsSinceStart = spouseAge - spouseSSAge;
         const colaFactor = Math.pow(1 + (socialSecurity.colaRate || 0), yearsSinceStart);
-        passiveIncome += adjustedMonthly * 12 * colaFactor;
+        ssIncome += adjustedMonthly * 12 * colaFactor;
       }
     }
 
@@ -152,11 +153,11 @@ export function calculateProjection(
       const yearsSincePensionStart = age - assets.pension.startAge;
       const pensionColaRate = assets.pension.colaRate ?? 0;
       const pensionColaFactor = Math.pow(1 + pensionColaRate, yearsSincePensionStart);
-      passiveIncome += assets.pension.annualBenefit * pensionColaFactor;
+      pensionIncome += assets.pension.annualBenefit * pensionColaFactor;
     }
 
     // Total non-employment income (SS + pension + retirement income streams)
-    const totalPassiveIncome = passiveIncome + retirementIncomeStreams;
+    const totalPassiveIncome = ssIncome + pensionIncome + retirementIncomeStreams;
 
     // Step 1: Add per-account contributions (date-bounded, independent of phase)
     const contributionResult = addPerAccountContributions(assetBalanceMap, assets.accounts, year, currentYear);
@@ -232,6 +233,8 @@ export function calculateProjection(
       phase,
       expenses: yearExpenses,
       income: totalIncome,
+      ssIncome,
+      pensionIncome,
       employmentIncome: employmentResult.grossIncome,
       employmentTax: employmentResult.tax,
       contributions: yearContributions,

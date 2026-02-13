@@ -204,6 +204,8 @@ export interface YearProjection {
   phase: FinancialPhase;          // 'accumulating' | 'fi'
   expenses: number;
   income: number;                 // SS + pension + retirement income streams
+  ssIncome: number;               // Social Security income only
+  pensionIncome: number;          // Pension income only
   employmentIncome: number;       // Net after-tax employment income
   employmentTax: number;          // Tax deducted from gross employment income
   contributions: number;          // Added to retirement accounts

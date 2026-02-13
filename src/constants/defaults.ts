@@ -86,7 +86,7 @@ export const GUEST_MODE_KEY = 'fi-runway-guest-mode';
 // Account type display names
 export const ACCOUNT_TYPE_LABELS: Record<Asset['type'], string> = {
   taxable: 'Taxable',
-  traditional: 'Traditional',
+  traditional: 'Traditional IRA',
   roth: 'Roth',
   hsa: 'HSA',
   cash: 'Cash',

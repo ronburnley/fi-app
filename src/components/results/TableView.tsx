@@ -24,13 +24,13 @@ export function TableView() {
 
   // Check if there's employment income (to show employment-related columns)
   const hasEmploymentIncome = state.income.employment || state.income.spouseEmployment;
-  const hasRetirementIncome = state.income.retirementIncomes.length > 0;
+  const hasRetirementIncome = state.income.retirementIncomes.length > 0 || !!state.assets.pension;
 
   // Auto-hide columns that are all-zero across the entire timeline
   const columnVisibility = useMemo(() => {
     const has = (fn: (p: (typeof projections)[0]) => boolean) => projections.some(fn);
     return {
-      income: has(p => p.income > 0),
+      ssIncome: has(p => p.ssIncome > 0),
       gap: has(p => p.gap > 0),
       withdrawal: has(p => p.withdrawal > 0),
       federalTax: has(p => p.federalTax > 0),
@@ -89,15 +89,15 @@ export function TableView() {
               )}
               {hasRetirementIncome && (
                 <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                  Ret. Inc
+                  Ret. Income
                 </th>
               )}
               <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
                 Expenses
               </th>
-              {columnVisibility.income && (
+              {columnVisibility.ssIncome && (
                 <th className="px-4 py-2 text-right text-xs font-medium text-text-muted whitespace-nowrap">
-                  Income
+                  SS Income
                 </th>
               )}
               {columnVisibility.gap && (
@@ -211,15 +211,15 @@ export function TableView() {
                   )}
                   {hasRetirementIncome && (
                     <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                      {projection.retirementIncome > 0 ? formatCurrency(projection.retirementIncome) : '-'}
+                      {projection.retirementIncome + projection.pensionIncome > 0 ? formatCurrency(projection.retirementIncome + projection.pensionIncome) : '-'}
                     </td>
                   )}
                   <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
                     {projection.expenses > 0 ? formatCurrency(projection.expenses) : '-'}
                   </td>
-                  {columnVisibility.income && (
+                  {columnVisibility.ssIncome && (
                     <td className="px-4 py-2 text-right text-text-secondary tabular-nums whitespace-nowrap">
-                      {projection.income > 0 ? formatCurrency(projection.income) : '-'}
+                      {projection.ssIncome > 0 ? formatCurrency(projection.ssIncome) : '-'}
                     </td>
                   )}
                   {columnVisibility.gap && (
