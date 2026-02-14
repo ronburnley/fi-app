@@ -59,14 +59,6 @@ export function AssumptionsSection() {
               min={0}
               max={15}
             />
-            <PercentInput
-              label="Withdrawal Rate"
-              value={assumptions.safeWithdrawalRate}
-              onChange={(value) => updateAssumptions({ safeWithdrawalRate: value })}
-              hint="Sets FI Number target (reference only)"
-              min={1}
-              max={10}
-            />
           </div>
         </div>
 

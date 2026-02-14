@@ -87,7 +87,6 @@ function createTestState(overrides: Partial<AppState> = {}): AppState {
       capitalGainsTaxRate: 0.15,
       rothTaxRate: 0,
       withdrawalOrder: ['taxable', 'traditional', 'roth'],
-      safeWithdrawalRate: 0.04,
       penaltySettings: {
         earlyWithdrawalPenaltyRate: 0.10,
         hsaEarlyPenaltyRate: 0.20,
@@ -130,8 +129,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -197,8 +195,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -251,8 +248,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -327,8 +323,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -383,8 +378,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: true,
@@ -420,8 +414,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -478,8 +471,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: true, // Enabled, but account is IRA not 401k
@@ -540,8 +532,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -606,8 +597,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -655,8 +645,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -859,8 +848,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -945,8 +933,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -993,8 +980,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,
@@ -1051,8 +1037,7 @@ describe('Integration Tests', () => {
           capitalGainsTaxRate: 0.15,
           rothTaxRate: 0,
           withdrawalOrder: ['taxable', 'traditional', 'roth'],
-          safeWithdrawalRate: 0.04,
-          penaltySettings: {
+              penaltySettings: {
             earlyWithdrawalPenaltyRate: 0.10,
             hsaEarlyPenaltyRate: 0.20,
             enableRule55: false,

@@ -128,10 +128,6 @@ export function validateAssumptions(assumptions: Assumptions): ValidationError[]
     errors.push({ field: 'capitalGainsTaxRate', message: 'Capital gains rate should be between 0% and 40%' });
   }
 
-  if (assumptions.safeWithdrawalRate < 0.01 || assumptions.safeWithdrawalRate > 0.1) {
-    errors.push({ field: 'safeWithdrawalRate', message: 'Safe withdrawal rate should be between 1% and 10%' });
-  }
-
   if (assumptions.terminalBalanceTarget !== undefined && assumptions.terminalBalanceTarget < 0) {
     errors.push({ field: 'terminalBalanceTarget', message: 'Terminal balance target cannot be negative' });
   }

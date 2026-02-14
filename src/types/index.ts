@@ -181,7 +181,6 @@ export interface Assumptions {
   capitalGainsTaxRate: number;
   rothTaxRate: number;
   withdrawalOrder: WithdrawalSource[];
-  safeWithdrawalRate: number;
   penaltySettings: PenaltySettings;
   terminalBalanceTarget?: number; // Target balance at life expectancy (default 0)
   accumulationSurplusHandling?: AccumulationSurplusHandling; // Default: ignore

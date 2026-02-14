@@ -92,7 +92,6 @@ function createTestState(overrides: Partial<AppState> = {}): AppState {
       capitalGainsTaxRate: 0.15,
       rothTaxRate: 0,
       withdrawalOrder: ['taxable', 'traditional', 'roth'],
-      safeWithdrawalRate: 0.04,
       penaltySettings: {
         earlyWithdrawalPenaltyRate: 0.10,
         hsaEarlyPenaltyRate: 0.20,
@@ -831,8 +830,7 @@ describe('Withdrawal Penalties', () => {
         investmentReturn: 0, inflationRate: 0,
         traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
         withdrawalOrder: ['traditional'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
 
@@ -868,8 +866,7 @@ describe('Withdrawal Penalties', () => {
         investmentReturn: 0, inflationRate: 0,
         traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
         withdrawalOrder: ['roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
 
@@ -899,8 +896,7 @@ describe('Withdrawal Penalties', () => {
         investmentReturn: 0, inflationRate: 0,
         traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
 
@@ -973,8 +969,7 @@ describe('Per-Account Contributions', () => {
         investmentReturn: 0, inflationRate: 0,
         traditionalTaxRate: 0.22, capitalGainsTaxRate: 0.15, rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
 
@@ -1079,8 +1074,7 @@ describe('Surplus Handling', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: {
+          penaltySettings: {
           earlyWithdrawalPenaltyRate: 0.10,
           hsaEarlyPenaltyRate: 0.20,
           enableRule55: false,
@@ -1169,8 +1163,7 @@ describe('Achievable FI Age', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: {
+          penaltySettings: {
           earlyWithdrawalPenaltyRate: 0.10,
           hsaEarlyPenaltyRate: 0.20,
           enableRule55: false,
@@ -1304,8 +1297,7 @@ describe('Shortfall Detection', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['traditional', 'taxable', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: {
+          penaltySettings: {
           earlyWithdrawalPenaltyRate: 0.10,
           hsaEarlyPenaltyRate: 0.20,
           enableRule55: false,
@@ -1377,28 +1369,29 @@ describe('Expense Inflation', () => {
 // ==================== Summary Calculations ====================
 
 describe('Summary Calculations', () => {
-  it('calculates FI number correctly', () => {
+  it('calculates FI number as net worth at achievable FI age', () => {
     const state = createTestState({
-      expenses: {
-        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 80000, category: 'living' }],
+      profile: { currentAge: 45, targetFIAge: 55, lifeExpectancy: 95, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 2000000, costBasis: 1200000 },
+        ],
       },
-      assumptions: {
-        investmentReturn: 0.06,
-        inflationRate: 0.03,
-        traditionalTaxRate: 0.22,
-        capitalGainsTaxRate: 0.15,
-        rothTaxRate: 0,
-        withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, category: 'living' }],
       },
     });
 
+    const achievableFI = calculateAchievableFIAge(state);
     const projections = calculateProjection(state);
-    const summary = calculateSummary(state, projections);
+    const summary = calculateSummary(state, projections, undefined, achievableFI.achievableFIAge);
 
-    // FI Number = 80000 / 0.04 = 2,000,000
-    expect(summary.fiNumber).toBe(2000000);
+    // FI Number should equal totalNetWorth at the achievable FI age
+    expect(achievableFI.achievableFIAge).not.toBeNull();
+    const fiYearProjection = projections.find(p => p.age === achievableFI.achievableFIAge);
+    expect(fiYearProjection).toBeDefined();
+    expect(summary.fiNumber).toBe(fiYearProjection!.totalNetWorth);
   });
 
   it('calculates current net worth correctly', () => {
@@ -1442,8 +1435,7 @@ describe('FI Phase Return Rate', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
 
@@ -1476,8 +1468,7 @@ describe('FI Phase Return Rate', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
     const projectionsAllHigh = calculateProjection(stateAllHigh);
@@ -1494,7 +1485,6 @@ describe('FI Phase Return Rate', () => {
       capitalGainsTaxRate: 0.15,
       rothTaxRate: 0,
       withdrawalOrder: ['taxable' as const, 'traditional' as const, 'roth' as const],
-      safeWithdrawalRate: 0.04,
       penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
     };
 
@@ -1573,8 +1563,7 @@ describe('FI Phase Return Rate', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     });
     const projections4 = calculateProjection(state4);
@@ -1617,8 +1606,7 @@ describe('FI Phase Return Rate', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable', 'traditional', 'roth'],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     }));
 
@@ -1646,8 +1634,7 @@ describe('FI Phase Return Rate', () => {
         capitalGainsTaxRate: 0.15,
         rothTaxRate: 0,
         withdrawalOrder: ['taxable' as const, 'traditional' as const, 'roth' as const],
-        safeWithdrawalRate: 0.04,
-        penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+          penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
       },
     };
 

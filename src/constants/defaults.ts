@@ -62,7 +62,6 @@ export const DEFAULT_STATE: AppState = {
     capitalGainsTaxRate: 0.15,
     rothTaxRate: 0,
     withdrawalOrder: ['taxable', 'traditional', 'roth'],
-    safeWithdrawalRate: 0.04,
     penaltySettings: {
       earlyWithdrawalPenaltyRate: 0.10,
       hsaEarlyPenaltyRate: 0.20,

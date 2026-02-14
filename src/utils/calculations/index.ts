@@ -18,7 +18,7 @@ export {
 export { calculateProjection } from './projection';
 
 // Summary
-export { calculateSummary, calculateFINumber } from './summary';
+export { calculateSummary } from './summary';
 
 // FI age binary search
 export { calculateAchievableFIAge } from './fiSearch';

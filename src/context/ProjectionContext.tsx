@@ -45,8 +45,8 @@ export function ProjectionProvider({ children }: { children: ReactNode }) {
   );
 
   const summary = useMemo(
-    () => calculateSummary(state, projections, whatIf),
-    [state, projections, whatIf]
+    () => calculateSummary(state, projections, whatIf, achievableFI.achievableFIAge),
+    [state, projections, whatIf, achievableFI.achievableFIAge]
   );
 
   // Sync targetFIAge with calculated achievable FI age

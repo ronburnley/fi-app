@@ -2,22 +2,22 @@ import type {
   AppState,
   YearProjection,
   ProjectionSummary,
-  WhatIfAdjustments,
 } from '../../types';
-import { calculateBaseAnnualSpending } from './expenses';
 
 export function calculateSummary(
   state: AppState,
   projections: YearProjection[],
-  whatIf?: WhatIfAdjustments
+  _whatIf?: unknown,
+  achievableFIAge?: number | null
 ): ProjectionSummary {
-  const currentYear = new Date().getFullYear();
-  const baseAnnualSpending = calculateBaseAnnualSpending(state.expenses, currentYear);
-  const effectiveSpending = baseAnnualSpending * (1 + (whatIf?.spendingAdjustment || 0));
-  const effectiveSWR = state.assumptions.safeWithdrawalRate;
-
-  // FI Number
-  const fiNumber = effectiveSpending / effectiveSWR;
+  // FI Number: net worth at the achievable FI age from the projection timeline
+  let fiNumber = 0;
+  if (achievableFIAge != null) {
+    const fiYearProjection = projections.find((p) => p.age === achievableFIAge);
+    if (fiYearProjection) {
+      fiNumber = fiYearProjection.totalNetWorth;
+    }
+  }
 
   // Current Net Worth (liquid assets only)
   const currentNetWorth = state.assets.accounts.reduce(
@@ -72,8 +72,4 @@ export function calculateSummary(
     bottleneckAge,
     bottleneckBalance,
   };
-}
-
-export function calculateFINumber(annualSpending: number, swr: number): number {
-  return annualSpending / swr;
 }

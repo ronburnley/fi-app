@@ -52,10 +52,10 @@ export function SummaryMetrics() {
         <div className="bg-bg-secondary border border-border-subtle rounded-lg p-4">
           <p className="text-xs text-text-muted mb-1">FI Number</p>
           <p className="text-xl font-semibold text-text-primary tabular-nums">
-            {formatCurrency(summary.fiNumber, true)}
+            {summary.fiNumber > 0 ? formatCurrency(summary.fiNumber, true) : '--'}
           </p>
           <p className="text-xs text-text-muted mt-1">
-            Based on {(state.assumptions.safeWithdrawalRate * 100).toFixed(0)}% SWR
+            Net worth needed at FI
           </p>
         </div>
 
@@ -67,10 +67,14 @@ export function SummaryMetrics() {
               isOnTrack ? 'text-accent-primary' : 'text-text-primary'
             }`}
           >
-            {Math.min(100, Math.round((summary.currentNetWorth / summary.fiNumber) * 100))}%
+            {summary.fiNumber > 0
+              ? `${Math.min(100, Math.round((summary.currentNetWorth / summary.fiNumber) * 100))}%`
+              : '0%'}
           </p>
           <p className="text-xs text-text-muted mt-1">
-            {isOnTrack ? 'FI ready' : `${formatCurrency(Math.abs(summary.gap), true)} to go`}
+            {summary.fiNumber > 0
+              ? isOnTrack ? 'FI ready' : `${formatCurrency(Math.abs(summary.gap), true)} to go`
+              : 'Enter data to calculate'}
           </p>
         </div>
       </div>
