@@ -20,5 +20,5 @@ export { calculateProjection } from './projection';
 // Summary
 export { calculateSummary } from './summary';
 
-// FI age binary search
-export { calculateAchievableFIAge } from './fiSearch';
+// FI age search + goal guidance
+export { calculateAchievableFIAge, calculateGoalFIGuidance } from './fiSearch';

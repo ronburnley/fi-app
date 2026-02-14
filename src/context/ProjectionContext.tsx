@@ -1,19 +1,20 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useEffect, useRef, type ReactNode } from 'react';
 import { useApp } from './AppContext';
-import { calculateProjection, calculateSummary, calculateAchievableFIAge } from '../utils/calculations';
-import type { YearProjection, ProjectionSummary, AchievableFIResult } from '../types';
+import { calculateProjection, calculateSummary, calculateAchievableFIAge, calculateGoalFIGuidance } from '../utils/calculations';
+import type { YearProjection, ProjectionSummary, AchievableFIResult, GoalFIGuidance } from '../types';
 
 interface ProjectionContextType {
   projections: YearProjection[];
   summary: ProjectionSummary;
   achievableFI: AchievableFIResult;
+  goalFIGuidance: GoalFIGuidance | null;
 }
 
 const ProjectionContext = createContext<ProjectionContextType | null>(null);
 
 export function ProjectionProvider({ children }: { children: ReactNode }) {
-  const { state, whatIf, dispatch } = useApp();
+  const { state, whatIf, dispatch, goalFIAge } = useApp();
   const lastCalculatedFIAge = useRef<number | null>(null);
 
   const { assets, income, expenses, socialSecurity, assumptions, lifeEvents, profile } = state;
@@ -49,6 +50,11 @@ export function ProjectionProvider({ children }: { children: ReactNode }) {
     [state, projections, whatIf, achievableFI.achievableFIAge]
   );
 
+  const goalFIGuidance = useMemo(() => {
+    if (goalFIAge === null) return null;
+    return calculateGoalFIGuidance(state, goalFIAge, achievableFI.achievableFIAge, whatIf);
+  }, [goalFIAge, state, achievableFI.achievableFIAge, whatIf]);
+
   // Sync targetFIAge with calculated achievable FI age
   useEffect(() => {
     // When achievable, set targetFIAge to the calculated FI age.
@@ -66,7 +72,7 @@ export function ProjectionProvider({ children }: { children: ReactNode }) {
   }, [achievableFI.achievableFIAge, targetFIAge, lifeExpectancy, dispatch]);
 
   return (
-    <ProjectionContext.Provider value={{ projections, summary, achievableFI }}>
+    <ProjectionContext.Provider value={{ projections, summary, achievableFI, goalFIGuidance }}>
       {children}
     </ProjectionContext.Provider>
   );

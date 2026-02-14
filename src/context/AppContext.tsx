@@ -28,6 +28,8 @@ interface AppContextType {
   dispatch: React.Dispatch<AppAction>;
   whatIf: WhatIfAdjustments;
   setWhatIf: React.Dispatch<React.SetStateAction<WhatIfAdjustments>>;
+  goalFIAge: number | null;
+  setGoalFIAge: (age: number | null) => void;
   syncStatus: SyncStatus;
   isLoading: boolean;
   needsMigration: boolean;
@@ -368,6 +370,7 @@ export function AppProvider({ children }: AppProviderProps) {
   const { user, isGuest } = useAuth();
   const [state, dispatch] = useReducer(appReducer, DEFAULT_STATE);
   const [whatIf, setWhatIf] = useState<WhatIfAdjustments>(DEFAULT_WHAT_IF);
+  const [goalFIAge, setGoalFIAge] = useState<number | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [isLoading, setIsLoading] = useState(true);
   const [planId, setPlanId] = useState<string | null>(null);
@@ -599,6 +602,8 @@ export function AppProvider({ children }: AppProviderProps) {
         dispatch,
         whatIf,
         setWhatIf,
+        goalFIAge,
+        setGoalFIAge,
         syncStatus,
         isLoading,
         needsMigration,

@@ -3,6 +3,7 @@ import type {
   WhatIfAdjustments,
   AchievableFIResult,
   ShortfallGuidance,
+  GoalFIGuidance,
   YearProjection,
 } from '../../types';
 import { calculateProjection } from './projection';
@@ -72,6 +73,25 @@ function calculateConfidence(
   return { confidenceLevel, bufferYears };
 }
 
+function calculateBaseSpending(state: AppState): number {
+  const currentYear = new Date().getFullYear();
+  let baseSpending = 0;
+  for (const expense of state.expenses.categories) {
+    const startYear = expense.startYear ?? currentYear;
+    const endYear = expense.endYear ?? Infinity;
+    if (currentYear >= startYear && currentYear <= endYear) {
+      baseSpending += expense.annualAmount;
+    }
+  }
+  if (state.expenses.home) {
+    if (state.expenses.home.mortgage) {
+      baseSpending += state.expenses.home.mortgage.monthlyPayment * 12;
+    }
+    baseSpending += state.expenses.home.propertyTax + state.expenses.home.insurance;
+  }
+  return baseSpending;
+}
+
 /**
  * Calculate shortfall guidance when FI is not achievable.
  * Provides actionable numbers: when money runs out, how much to cut spending,
@@ -101,22 +121,7 @@ function calculateShortfallGuidance(
       ssStartAge: whatIf?.ssStartAge ?? state.socialSecurity.startAge,
     };
     if (isFIAgeViable(state, latestFIAge, adjustedWhatIf)) {
-      // Calculate annual dollar amount of reduction needed
-      const currentYear = new Date().getFullYear();
-      let baseSpending = 0;
-      for (const expense of state.expenses.categories) {
-        const startYear = expense.startYear ?? currentYear;
-        const endYear = expense.endYear ?? Infinity;
-        if (currentYear >= startYear && currentYear <= endYear) {
-          baseSpending += expense.annualAmount;
-        }
-      }
-      if (state.expenses.home) {
-        if (state.expenses.home.mortgage) {
-          baseSpending += state.expenses.home.mortgage.monthlyPayment * 12;
-        }
-        baseSpending += state.expenses.home.propertyTax + state.expenses.home.insurance;
-      }
+      const baseSpending = calculateBaseSpending(state);
       spendingReductionNeeded = Math.round(baseSpending * currentSpendingMultiplier * reduction);
       break;
     }
@@ -195,5 +200,156 @@ export function calculateAchievableFIAge(
     bufferYears,
     yearsUntilFI,
     fiAtCurrentAge: achievableFIAge === currentAge,
+  };
+}
+
+/**
+ * Calculate goal FI guidance — what it takes to retire at a specific target age.
+ */
+export function calculateGoalFIGuidance(
+  state: AppState,
+  goalAge: number,
+  achievableFIAge: number | null,
+  whatIf?: WhatIfAdjustments
+): GoalFIGuidance {
+  // On track: goal matches achievable
+  if (achievableFIAge !== null && goalAge === achievableFIAge) {
+    return { goalAge, achievableAge: achievableFIAge, status: 'on_track' };
+  }
+
+  // Ahead of goal: goal is later than achievable (user wants to work longer)
+  if (achievableFIAge !== null && goalAge > achievableFIAge) {
+    const evaluation = evaluateFIAge(state, goalAge, whatIf);
+    const surplusAtLE = evaluation.terminalBalance;
+
+    // Calculate buffer years beyond LE
+    const confidenceResult = calculateConfidence(state, goalAge, state.profile.lifeExpectancy, whatIf);
+    const additionalBufferYears = confidenceResult.bufferYears;
+
+    // Find spending increase room: iterate spending increases until no longer viable
+    let spendingIncreaseRoom = 0;
+    const currentSpendingMultiplier = 1 + (whatIf?.spendingAdjustment || 0);
+    for (let increase = 0.01; increase <= 1.0; increase += 0.01) {
+      const adjustedWhatIf: WhatIfAdjustments = {
+        ...whatIf,
+        spendingAdjustment: (currentSpendingMultiplier * (1 + increase)) - 1,
+        returnAdjustment: whatIf?.returnAdjustment ?? state.assumptions.investmentReturn,
+        ssStartAge: whatIf?.ssStartAge ?? state.socialSecurity.startAge,
+      };
+      if (!isFIAgeViable(state, goalAge, adjustedWhatIf)) {
+        // Previous increment was the max
+        const baseSpending = calculateBaseSpending(state);
+        spendingIncreaseRoom = Math.round(baseSpending * currentSpendingMultiplier * (increase - 0.01));
+        break;
+      }
+    }
+
+    return {
+      goalAge,
+      achievableAge: achievableFIAge,
+      status: 'ahead_of_goal',
+      surplusAtLE,
+      additionalBufferYears,
+      spendingIncreaseRoom,
+    };
+  }
+
+  // Behind goal: goal is earlier than achievable (or FI not achievable at all)
+  const currentSpendingMultiplier = 1 + (whatIf?.spendingAdjustment || 0);
+  const currentReturn = whatIf?.returnAdjustment ?? state.assumptions.investmentReturn;
+  const currentSSAge = whatIf?.ssStartAge ?? state.socialSecurity.startAge;
+  const baseSpending = calculateBaseSpending(state);
+  const effectiveSpending = baseSpending * currentSpendingMultiplier;
+
+  // Lever 1: Spending reduction (1% steps up to 80%)
+  let spendingReduction: GoalFIGuidance['spendingReduction'];
+  for (let pct = 0.01; pct <= 0.80; pct += 0.01) {
+    const adjustedWhatIf: WhatIfAdjustments = {
+      ...whatIf,
+      spendingAdjustment: (currentSpendingMultiplier * (1 - pct)) - 1,
+      returnAdjustment: currentReturn,
+      ssStartAge: currentSSAge,
+    };
+    if (isFIAgeViable(state, goalAge, adjustedWhatIf)) {
+      const annualAmount = Math.round(effectiveSpending * pct);
+      spendingReduction = {
+        annualAmount,
+        percentReduction: Math.round(pct * 100),
+        resultingAnnualSpending: Math.round(effectiveSpending - annualAmount),
+      };
+      break;
+    }
+  }
+
+  // Lever 2: Additional savings needed
+  // Inject extra annual contributions into a synthetic taxable account and test viability.
+  // Iterate in $6,000/yr ($500/mo) steps up to $300,000/yr ($25,000/mo).
+  let additionalSavingsNeeded: GoalFIGuidance['additionalSavingsNeeded'];
+  const savingsSearchMax = 300000;
+  for (let extra = 6000; extra <= savingsSearchMax; extra += 6000) {
+    const testState: AppState = {
+      ...state,
+      assets: {
+        ...state.assets,
+        accounts: [
+          ...state.assets.accounts,
+          {
+            id: '__goal_extra_savings',
+            name: 'Extra Savings',
+            type: 'taxable',
+            owner: 'self',
+            balance: 0,
+            costBasis: 0,
+            annualContribution: extra,
+          },
+        ],
+      },
+    };
+    if (isFIAgeViable(testState, goalAge, whatIf)) {
+      additionalSavingsNeeded = { amount: extra, sufficient: true };
+      break;
+    }
+  }
+  // If we hit the cap without finding viability, report the max as insufficient
+  if (!additionalSavingsNeeded) {
+    additionalSavingsNeeded = { amount: savingsSearchMax, sufficient: false };
+  }
+
+  // Lever 3: Required return (0.5% steps from current to 12%)
+  let requiredReturn: GoalFIGuidance['requiredReturn'];
+  for (let rate = currentReturn + 0.005; rate <= 0.12; rate += 0.005) {
+    const adjustedWhatIf: WhatIfAdjustments = {
+      ...whatIf,
+      spendingAdjustment: whatIf?.spendingAdjustment ?? 0,
+      returnAdjustment: rate,
+      ssStartAge: currentSSAge,
+    };
+    if (isFIAgeViable(state, goalAge, adjustedWhatIf)) {
+      requiredReturn = { rate: Math.round(rate * 1000) / 1000, currentRate: currentReturn };
+      break;
+    }
+  }
+
+  // Lever 4: SS delay to 70 (if not already at 70)
+  let ssDelayBenefit: GoalFIGuidance['ssDelayBenefit'];
+  if (state.socialSecurity.include && currentSSAge !== 70) {
+    const adjustedWhatIf: WhatIfAdjustments = {
+      ...whatIf,
+      spendingAdjustment: whatIf?.spendingAdjustment ?? 0,
+      returnAdjustment: currentReturn,
+      ssStartAge: 70,
+    };
+    const viable = isFIAgeViable(state, goalAge, adjustedWhatIf);
+    ssDelayBenefit = { newStartAge: 70, sufficient: viable };
+  }
+
+  return {
+    goalAge,
+    achievableAge: achievableFIAge,
+    status: 'behind_goal',
+    spendingReduction,
+    additionalSavingsNeeded,
+    requiredReturn,
+    ssDelayBenefit,
   };
 }

@@ -1,8 +1,15 @@
-import { SummaryMetrics, ChartView, TableView } from '../../results';
+import { SummaryMetrics, ChartView, TableView, GoalFIAgeCard, GoalFIGuidancePanel } from '../../results';
 import { WhatIfSection } from '../../inputs/WhatIfSection';
 import { WizardNavigation } from '../WizardNavigation';
+import { useApp } from '../../../context/AppContext';
+import { useProjectionContext } from '../../../context/ProjectionContext';
 
 export function ResultsStep() {
+  const { goalFIAge } = useApp();
+  const { goalFIGuidance } = useProjectionContext();
+
+  const showGuidancePanel = goalFIAge !== null && goalFIGuidance !== null && goalFIGuidance.status !== 'on_track';
+
   return (
     <div className="max-w-[1600px] mx-auto">
       <div className="text-center mb-8">
@@ -17,9 +24,12 @@ export function ResultsStep() {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-6">
         <div className="xl:col-span-3 space-y-6">
           <SummaryMetrics />
+          {goalFIGuidance?.status === 'on_track' && <GoalFIGuidancePanel />}
+          {showGuidancePanel && <GoalFIGuidancePanel />}
           <ChartView />
         </div>
-        <div className="xl:col-span-1">
+        <div className="xl:col-span-1 space-y-4">
+          <GoalFIAgeCard />
           <WhatIfSection />
         </div>
       </div>

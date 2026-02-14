@@ -266,6 +266,21 @@ export interface AchievableFIResult {
   shortfallGuidance?: ShortfallGuidance;  // Only present when not_achievable
 }
 
+export interface GoalFIGuidance {
+  goalAge: number;
+  achievableAge: number | null;
+  status: 'on_track' | 'ahead_of_goal' | 'behind_goal';
+  // ahead_of_goal
+  surplusAtLE?: number;
+  additionalBufferYears?: number;
+  spendingIncreaseRoom?: number;
+  // behind_goal
+  spendingReduction?: { annualAmount: number; percentReduction: number; resultingAnnualSpending: number };
+  additionalSavingsNeeded?: { amount: number; sufficient: boolean };
+  requiredReturn?: { rate: number; currentRate: number };
+  ssDelayBenefit?: { newStartAge: 62 | 67 | 70; sufficient: boolean };
+}
+
 export type AppAction =
   | { type: 'UPDATE_PROFILE'; payload: Partial<UserProfile> }
   | { type: 'UPDATE_ASSETS'; payload: Partial<Assets> }

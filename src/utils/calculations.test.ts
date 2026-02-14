@@ -3,6 +3,7 @@ import {
   calculateProjection,
   calculateSummary,
   calculateAchievableFIAge,
+  calculateGoalFIGuidance,
   calculateMonthlyPayment,
   calculateRemainingBalance,
   calculateHomeEquity,
@@ -10,7 +11,7 @@ import {
   getSSAdjustmentFactor,
   getAdjustedSSBenefit,
 } from './calculations';
-import type { AppState } from '../types';
+import type { AppState, WhatIfAdjustments } from '../types';
 
 // Helper to create a minimal valid state for testing
 function createTestState(overrides: Partial<AppState> = {}): AppState {
@@ -1686,5 +1687,271 @@ describe('FI Phase Return Rate', () => {
     for (const p of fiProjections) {
       expect(summary.bottleneckBalance).toBeLessThanOrEqual(p.totalNetWorth);
     }
+  });
+});
+
+// ==================== Goal FI Guidance ====================
+
+describe('Goal FI Guidance', () => {
+  it('returns on_track when goal equals achievable age', () => {
+    const state = createTestState({
+      income: {
+        employment: { annualGrossIncome: 150000, effectiveTaxRate: 0.25 },
+        retirementIncomes: [],
+      },
+    });
+    const achievable = calculateAchievableFIAge(state);
+    expect(achievable.achievableFIAge).not.toBeNull();
+
+    const guidance = calculateGoalFIGuidance(state, achievable.achievableFIAge!, achievable.achievableFIAge);
+    expect(guidance.status).toBe('on_track');
+    expect(guidance.goalAge).toBe(achievable.achievableFIAge);
+    expect(guidance.achievableAge).toBe(achievable.achievableFIAge);
+  });
+
+  it('returns ahead_of_goal when goal is later than achievable', () => {
+    const state = createTestState({
+      income: {
+        employment: { annualGrossIncome: 150000, effectiveTaxRate: 0.25 },
+        retirementIncomes: [],
+      },
+    });
+    const achievable = calculateAchievableFIAge(state);
+    expect(achievable.achievableFIAge).not.toBeNull();
+
+    const goalAge = achievable.achievableFIAge! + 5;
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+    expect(guidance.status).toBe('ahead_of_goal');
+    expect(guidance.surplusAtLE).toBeDefined();
+    expect(guidance.surplusAtLE).toBeGreaterThan(0);
+    expect(guidance.additionalBufferYears).toBeDefined();
+  });
+
+  it('returns behind_goal when goal is earlier than achievable', () => {
+    // Use a state where FI is achievable but not immediately
+    const state = createTestState({
+      assets: {
+        accounts: [
+          { id: 'cash-1', name: 'Cash', type: 'cash', owner: 'self', balance: 50000 },
+          { id: 'trad-1', name: '401k', type: 'traditional', owner: 'self', balance: 400000, is401k: true },
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'joint', balance: 200000, costBasis: 150000 },
+        ],
+      },
+      income: {
+        employment: { annualGrossIncome: 150000, effectiveTaxRate: 0.25 },
+        retirementIncomes: [],
+      },
+      expenses: {
+        categories: [{ id: 'e1', name: 'Living', annualAmount: 70000, category: 'living' }],
+      },
+    });
+
+    const achievable = calculateAchievableFIAge(state);
+    if (achievable.achievableFIAge === null || achievable.achievableFIAge <= state.profile.currentAge) {
+      // If already FI or not achievable, skip this specific assertion
+      return;
+    }
+
+    const goalAge = state.profile.currentAge + 2; // Very early goal
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+    expect(guidance.status).toBe('behind_goal');
+    // At least one lever should be computed
+    const hasLever = guidance.spendingReduction !== undefined ||
+      guidance.additionalSavingsNeeded !== undefined ||
+      guidance.requiredReturn !== undefined ||
+      guidance.ssDelayBenefit !== undefined;
+    expect(hasLever).toBe(true);
+  });
+
+  it('returns behind_goal with guidance when FI is not achievable', () => {
+    // Very high expenses, low assets — FI should be not achievable
+    const state = createTestState({
+      assets: {
+        accounts: [
+          { id: 'cash-1', name: 'Cash', type: 'cash', owner: 'self', balance: 10000 },
+        ],
+      },
+      income: {
+        employment: { annualGrossIncome: 50000, effectiveTaxRate: 0.20 },
+        retirementIncomes: [],
+      },
+      expenses: {
+        categories: [{ id: 'e1', name: 'Living', annualAmount: 80000, category: 'living' }],
+      },
+      socialSecurity: {
+        include: false,
+        monthlyBenefit: 0,
+        startAge: 67,
+        colaRate: 0,
+      },
+    });
+
+    const achievable = calculateAchievableFIAge(state);
+    // This should not be achievable
+    if (achievable.achievableFIAge !== null) return;
+
+    const guidance = calculateGoalFIGuidance(state, 60, null);
+    expect(guidance.status).toBe('behind_goal');
+    expect(guidance.achievableAge).toBeNull();
+  });
+
+  it('computes spending reduction lever with correct dollar amounts', () => {
+    const state = createTestState({
+      assets: {
+        accounts: [
+          { id: 'cash-1', name: 'Cash', type: 'cash', owner: 'self', balance: 100000 },
+          { id: 'trad-1', name: '401k', type: 'traditional', owner: 'self', balance: 500000, is401k: true },
+        ],
+      },
+      income: {
+        employment: { annualGrossIncome: 120000, effectiveTaxRate: 0.22 },
+        retirementIncomes: [],
+      },
+      expenses: {
+        categories: [{ id: 'e1', name: 'Living', annualAmount: 60000, category: 'living' }],
+      },
+    });
+
+    const achievable = calculateAchievableFIAge(state);
+    if (achievable.achievableFIAge === null || achievable.achievableFIAge <= state.profile.currentAge) return;
+
+    const goalAge = state.profile.currentAge + 1;
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+
+    if (guidance.spendingReduction) {
+      expect(guidance.spendingReduction.annualAmount).toBeGreaterThan(0);
+      expect(guidance.spendingReduction.percentReduction).toBeGreaterThan(0);
+      expect(guidance.spendingReduction.percentReduction).toBeLessThanOrEqual(80);
+      expect(guidance.spendingReduction.resultingAnnualSpending).toBeLessThan(60000);
+      // resultingAnnualSpending + annualAmount should approximately equal base spending
+      expect(guidance.spendingReduction.resultingAnnualSpending + guidance.spendingReduction.annualAmount).toBeCloseTo(60000, -2);
+    }
+  });
+
+  it('computes required return lever', () => {
+    const state = createTestState({
+      assumptions: {
+        investmentReturn: 0.05,
+        inflationRate: 0.03,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        penaltySettings: {
+          earlyWithdrawalPenaltyRate: 0.10,
+          hsaEarlyPenaltyRate: 0.20,
+          enableRule55: false,
+        },
+      },
+    });
+
+    const achievable = calculateAchievableFIAge(state);
+    if (achievable.achievableFIAge === null || achievable.achievableFIAge <= state.profile.currentAge + 1) return;
+
+    const goalAge = state.profile.currentAge + 2;
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+
+    if (guidance.requiredReturn) {
+      expect(guidance.requiredReturn.rate).toBeGreaterThan(guidance.requiredReturn.currentRate);
+      expect(guidance.requiredReturn.rate).toBeLessThanOrEqual(0.12);
+      expect(guidance.requiredReturn.currentRate).toBe(0.05);
+    }
+  });
+
+  it('computes SS delay lever when not already at 70', () => {
+    const state = createTestState({
+      socialSecurity: {
+        include: true,
+        monthlyBenefit: 2500,
+        startAge: 62,
+        colaRate: 0.02,
+        spouse: { include: false, monthlyBenefit: 0, startAge: 67 },
+      },
+    });
+
+    const achievable = calculateAchievableFIAge(state);
+    if (achievable.achievableFIAge === null || achievable.achievableFIAge <= state.profile.currentAge) return;
+
+    const goalAge = achievable.achievableFIAge - 2;
+    if (goalAge <= state.profile.currentAge) return;
+
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+    if (guidance.ssDelayBenefit) {
+      expect(guidance.ssDelayBenefit.newStartAge).toBe(70);
+      expect(typeof guidance.ssDelayBenefit.sufficient).toBe('boolean');
+    }
+  });
+
+  it('does not include SS delay lever when already at 70', () => {
+    const state = createTestState({
+      socialSecurity: {
+        include: true,
+        monthlyBenefit: 2500,
+        startAge: 70,
+        colaRate: 0.02,
+        spouse: { include: false, monthlyBenefit: 0, startAge: 67 },
+      },
+    });
+
+    const achievable = calculateAchievableFIAge(state);
+    if (achievable.achievableFIAge === null || achievable.achievableFIAge <= state.profile.currentAge) return;
+
+    const goalAge = achievable.achievableFIAge - 2;
+    if (goalAge <= state.profile.currentAge) return;
+
+    const whatIf: WhatIfAdjustments = { spendingAdjustment: 0, ssStartAge: 70 };
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge, whatIf);
+    expect(guidance.ssDelayBenefit).toBeUndefined();
+  });
+
+  it('ahead_of_goal computes spending increase room', () => {
+    const state = createTestState();
+    const achievable = calculateAchievableFIAge(state);
+    if (achievable.achievableFIAge === null) return;
+
+    const goalAge = achievable.achievableFIAge + 5;
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+    expect(guidance.status).toBe('ahead_of_goal');
+    expect(guidance.spendingIncreaseRoom).toBeDefined();
+    // Spending increase room should be non-negative
+    expect(guidance.spendingIncreaseRoom).toBeGreaterThanOrEqual(0);
+  });
+
+  it('respects what-if adjustments as baseline', () => {
+    const state = createTestState();
+    const whatIf: WhatIfAdjustments = {
+      spendingAdjustment: -0.10, // 10% spending reduction
+      ssStartAge: 67,
+    };
+
+    const achievable = calculateAchievableFIAge(state, whatIf);
+    if (achievable.achievableFIAge === null) return;
+
+    const guidance = calculateGoalFIGuidance(state, achievable.achievableFIAge, achievable.achievableFIAge, whatIf);
+    expect(guidance.status).toBe('on_track');
+  });
+
+  it('handles edge case: goal = currentAge', () => {
+    const state = createTestState();
+    const achievable = calculateAchievableFIAge(state);
+    const guidance = calculateGoalFIGuidance(state, state.profile.currentAge, achievable.achievableFIAge);
+
+    // Should be either on_track (if already FI) or behind_goal
+    expect(['on_track', 'behind_goal']).toContain(guidance.status);
+  });
+
+  it('handles edge case: goal = lifeExpectancy - 1', () => {
+    const state = createTestState({
+      income: {
+        employment: { annualGrossIncome: 150000, effectiveTaxRate: 0.25 },
+        retirementIncomes: [],
+      },
+    });
+    const achievable = calculateAchievableFIAge(state);
+    const goalAge = state.profile.lifeExpectancy - 1;
+    const guidance = calculateGoalFIGuidance(state, goalAge, achievable.achievableFIAge);
+
+    // Should be ahead_of_goal or on_track (since latest FI is very late)
+    expect(['on_track', 'ahead_of_goal']).toContain(guidance.status);
   });
 });
