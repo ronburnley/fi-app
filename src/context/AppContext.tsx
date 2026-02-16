@@ -18,6 +18,8 @@ import {
   migrateEndAge,
   needsInflationMigration,
   migrateInflation,
+  needsSurplusAccountMigration,
+  migrateSurplusAccount,
 } from '../utils/migration';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
@@ -77,14 +79,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
 
-    case 'REMOVE_ASSET':
+    case 'REMOVE_ASSET': {
+      const clearSurplusRef = state.assumptions.accumulationSurplusAccountId === action.payload;
       return {
         ...state,
         assets: {
           ...state.assets,
           accounts: state.assets.accounts.filter((asset) => asset.id !== action.payload),
         },
+        ...(clearSurplusRef && {
+          assumptions: {
+            ...state.assumptions,
+            accumulationSurplusAccountId: undefined,
+          },
+        }),
       };
+    }
 
     case 'UPDATE_INCOME':
       return {
@@ -354,11 +364,21 @@ function migrateData(data: AppState): AppState {
     };
   }
 
+  // Migrate surplus account type → specific account ID
+  let migratedAssumptions = data.assumptions;
+  if (needsSurplusAccountMigration(migratedAssumptions)) {
+    migratedAssumptions = migrateSurplusAccount(
+      migratedAssumptions as Parameters<typeof migrateSurplusAccount>[0],
+      migratedAssets?.accounts || []
+    );
+  }
+
   return mergeWithDefaults({
     ...data,
     assets: migratedAssets,
     expenses: migratedExpenses,
     income: migratedIncome,
+    assumptions: migratedAssumptions,
   });
 }
 

@@ -2,13 +2,24 @@ import { Card, PercentInput, Toggle, CurrencyInput, Select } from '../ui';
 import { useApp } from '../../context/AppContext';
 import { ACCOUNT_TYPE_LABELS } from '../../constants/defaults';
 import type { Assumptions, AccumulationSurplusHandling, PenaltySettings } from '../../types';
+import { useMemo } from 'react';
 
 export function AssumptionsSection() {
   const { state, dispatch } = useApp();
   const { assumptions } = state;
   const surplusHandling = assumptions.accumulationSurplusHandling ?? 'ignore';
-  const surplusAccountType = assumptions.accumulationSurplusAccountType ?? 'taxable';
-  const hasSurplusDestinationAccount = state.assets.accounts.some((account) => account.type === surplusAccountType);
+  const surplusAccountId = assumptions.accumulationSurplusAccountId;
+  const accounts = state.assets.accounts;
+
+  const accountOptions = useMemo(() =>
+    accounts.map((a) => ({
+      value: a.id,
+      label: `${a.name} (${ACCOUNT_TYPE_LABELS[a.type]})`,
+    })),
+    [accounts]
+  );
+
+  const selectedAccountExists = surplusAccountId ? accounts.some((a) => a.id === surplusAccountId) : false;
 
   const updateAssumptions = (payload: Partial<Assumptions>) => {
     dispatch({
@@ -85,13 +96,18 @@ export function AssumptionsSection() {
           {surplusHandling === 'route_to_account' && (
             <div className="mt-3">
               <Select
-                label="Surplus Destination Account Type"
-                value={surplusAccountType}
-                onChange={(value) => updateAssumptions({ accumulationSurplusAccountType: value as Assumptions['accumulationSurplusAccountType'] })}
-                options={Object.entries(ACCOUNT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
-                hint={hasSurplusDestinationAccount
-                  ? `Surplus is added to your largest ${ACCOUNT_TYPE_LABELS[surplusAccountType]} account.`
-                  : `No ${ACCOUNT_TYPE_LABELS[surplusAccountType]} account found yet. Surplus will be ignored until one exists.`}
+                label="Surplus Destination Account"
+                value={surplusAccountId ?? ''}
+                onChange={(value) => updateAssumptions({ accumulationSurplusAccountId: String(value) || undefined })}
+                options={[
+                  { value: '', label: 'Select an account...' },
+                  ...accountOptions,
+                ]}
+                hint={accounts.length === 0
+                  ? 'Add accounts in the Assets step first.'
+                  : selectedAccountExists
+                    ? 'Working-year surplus will be deposited into this account.'
+                    : 'Select an account to receive surplus deposits.'}
               />
             </div>
           )}

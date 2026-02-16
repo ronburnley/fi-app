@@ -12,6 +12,7 @@ import type {
   HomeExpense,
   Income,
   EmploymentIncome,
+  Assumptions,
 } from '../types';
 
 // Legacy employment format (had contribution fields and endAge)
@@ -426,6 +427,41 @@ export function migrateInflation(expenses: Expenses): Expenses {
   return {
     categories: migratedCategories,
     home: migratedHome,
+  };
+}
+
+// Check if assumptions have legacy accumulationSurplusAccountType that needs migrating to accumulationSurplusAccountId
+export function needsSurplusAccountMigration(assumptions: unknown): boolean {
+  if (typeof assumptions !== 'object' || assumptions === null) return false;
+  return 'accumulationSurplusAccountType' in (assumptions as Record<string, unknown>);
+}
+
+// Migrate legacy accumulationSurplusAccountType to accumulationSurplusAccountId
+// Finds the largest account of the old type (matches old engine behavior)
+export function migrateSurplusAccount(
+  assumptions: Assumptions & { accumulationSurplusAccountType?: AccountType },
+  accounts: Asset[]
+): Assumptions {
+  const oldType = assumptions.accumulationSurplusAccountType;
+  const { accumulationSurplusAccountType: _, ...rest } = assumptions;
+
+  if (!oldType || assumptions.accumulationSurplusHandling !== 'route_to_account') {
+    return rest;
+  }
+
+  // Find the largest account of the old type (matches old engine behavior)
+  const matchingAccounts = accounts.filter((a) => a.type === oldType);
+  if (matchingAccounts.length === 0) {
+    return rest;
+  }
+
+  const largest = matchingAccounts.reduce((best, current) =>
+    current.balance > best.balance ? current : best
+  );
+
+  return {
+    ...rest,
+    accumulationSurplusAccountId: largest.id,
   };
 }
 

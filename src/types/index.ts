@@ -184,7 +184,7 @@ export interface Assumptions {
   penaltySettings: PenaltySettings;
   terminalBalanceTarget?: number; // Target balance at life expectancy (default 0)
   accumulationSurplusHandling?: AccumulationSurplusHandling; // Default: ignore
-  accumulationSurplusAccountType?: AccountType; // Used when handling is route_to_account
+  accumulationSurplusAccountId?: string; // Asset ID to route surplus to when handling is route_to_account
 }
 
 export interface AppState {

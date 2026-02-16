@@ -1081,7 +1081,7 @@ describe('Surplus Handling', () => {
           enableRule55: false,
         },
         accumulationSurplusHandling: 'route_to_account',
-        accumulationSurplusAccountType: 'taxable',
+        accumulationSurplusAccountId: 'taxable-1',
       },
     });
 
@@ -1090,6 +1090,50 @@ describe('Surplus Handling', () => {
 
     // Net income = 150000 - 37500 = 112500; expense = 50000; surplus = 62500
     expect(year1.taxableBalance).toBe(162500);
+    expect(year1.withdrawalSource).toBe('N/A');
+  });
+
+  it('ignores surplus routing when account ID is missing or deleted', () => {
+    const state = createTestState({
+      profile: { currentAge: 45, targetFIAge: 50, lifeExpectancy: 60, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 100000, costBasis: 80000 },
+        ],
+      },
+      income: {
+        employment: {
+          annualGrossIncome: 150000,
+          effectiveTaxRate: 0.25,
+        },
+        retirementIncomes: [],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 50000, inflationAdjusted: false, category: 'living' }],
+      },
+      assumptions: {
+        investmentReturn: 0,
+        inflationRate: 0,
+        traditionalTaxRate: 0.22,
+        capitalGainsTaxRate: 0.15,
+        rothTaxRate: 0,
+        withdrawalOrder: ['taxable', 'traditional', 'roth'],
+        penaltySettings: {
+          earlyWithdrawalPenaltyRate: 0.10,
+          hsaEarlyPenaltyRate: 0.20,
+          enableRule55: false,
+        },
+        accumulationSurplusHandling: 'route_to_account',
+        accumulationSurplusAccountId: 'deleted-account-id',
+      },
+    });
+
+    const projections = calculateProjection(state);
+    const year1 = projections[0];
+
+    // Surplus should be ignored since account ID doesn't match any account
+    expect(year1.taxableBalance).toBe(100000);
     expect(year1.withdrawalSource).toBe('N/A');
   });
 });

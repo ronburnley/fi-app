@@ -31,7 +31,7 @@ export function calculateProjection(
   const penaltySettings = assumptions.penaltySettings;
   const stateTaxInfo = getStateTaxInfo(profile.state);
   const surplusHandling = assumptions.accumulationSurplusHandling ?? 'ignore';
-  const surplusAccountType = assumptions.accumulationSurplusAccountType ?? 'taxable';
+  const surplusAccountId = assumptions.accumulationSurplusAccountId;
 
   const recalculateBalancesFromMap = () => aggregateBalances(
     assets.accounts.map((a) => ({
@@ -42,17 +42,10 @@ export function calculateProjection(
   );
 
   const routeAccumulationSurplus = (surplus: number) => {
-    if (surplus <= 0) return;
+    if (surplus <= 0 || !surplusAccountId) return;
 
-    const destinationAssets = assets.accounts.filter((a) => a.type === surplusAccountType);
-    if (destinationAssets.length === 0) return;
-
-    // Route to the largest matching account to keep behavior deterministic.
-    const destination = destinationAssets.reduce((best, current) => {
-      const bestBalance = assetBalanceMap.get(best.id)?.balance ?? best.balance;
-      const currentBalance = assetBalanceMap.get(current.id)?.balance ?? current.balance;
-      return currentBalance > bestBalance ? current : best;
-    });
+    const destination = assets.accounts.find((a) => a.id === surplusAccountId);
+    if (!destination) return;
 
     const balanceInfo = assetBalanceMap.get(destination.id);
     if (!balanceInfo) return;
