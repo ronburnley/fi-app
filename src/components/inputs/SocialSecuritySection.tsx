@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Card, Toggle, CurrencyInput, Select, PercentInput } from '../ui';
 import { useApp } from '../../context/AppContext';
 import { getAdjustedSSBenefit, getSSAdjustmentFactor } from '../../utils/calculations';
@@ -7,7 +6,6 @@ import type { SpouseSocialSecurity } from '../../types';
 export function SocialSecuritySection() {
   const { state, dispatch } = useApp();
   const { socialSecurity, profile } = state;
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const updateSocialSecurity = (field: string, value: boolean | number) => {
     dispatch({
@@ -94,29 +92,15 @@ export function SocialSecuritySection() {
               </div>
             )}
 
-            {/* Advanced Settings */}
             <div className="pt-4 border-t border-border-subtle">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-sm text-text-muted hover:text-text-secondary transition-colors flex items-center gap-1"
-              >
-                <span className={`transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>▸</span>
-                Advanced Settings
-              </button>
-
-              {showAdvanced && (
-                <div className="mt-3">
-                  <PercentInput
-                    label="Annual COLA Rate"
-                    value={socialSecurity.colaRate ?? 0.02}
-                    onChange={(value) => updateSocialSecurity('colaRate', value)}
-                    hint="Cost of Living Adjustment (historical average ~2%)"
-                    min={0}
-                    max={10}
-                  />
-                </div>
-              )}
+              <PercentInput
+                label="Annual COLA Rate"
+                value={socialSecurity.colaRate ?? 0.02}
+                onChange={(value) => updateSocialSecurity('colaRate', value)}
+                hint="Cost of Living Adjustment (historical average ~2%)"
+                min={0}
+                max={10}
+              />
             </div>
           </>
         )}

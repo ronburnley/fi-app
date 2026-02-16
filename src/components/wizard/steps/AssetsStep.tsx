@@ -21,7 +21,6 @@ export function AssetsStep() {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [hasPension, setHasPension] = useState(!!assets.pension);
-  const [showPensionAdvanced, setShowPensionAdvanced] = useState(false);
 
   const isMarried = profile.filingStatus === 'married';
 
@@ -217,44 +216,14 @@ export function AssetsStep() {
                   />
                 </div>
 
-                {/* Advanced Settings - COLA */}
-                <div className="pt-3 border-t border-border-subtle/50">
-                  <button
-                    type="button"
-                    onClick={() => setShowPensionAdvanced(!showPensionAdvanced)}
-                    className="group flex items-center gap-2 text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
-                  >
-                    <svg
-                      className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                        showPensionAdvanced ? 'rotate-90' : ''
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                    <span className="font-medium">Advanced</span>
-                  </button>
-
-                  {showPensionAdvanced && (
-                    <div className="mt-3 max-w-[200px]">
-                      <PercentInput
-                        label="Annual COLA"
-                        value={assets.pension.colaRate ?? 0}
-                        onChange={(value) => updatePension('colaRate', value)}
-                        hint="Cost-of-living adjustment"
-                        min={0}
-                        max={10}
-                      />
-                    </div>
-                  )}
-                </div>
+                <PercentInput
+                  label="Annual COLA"
+                  value={assets.pension.colaRate ?? 0}
+                  onChange={(value) => updatePension('colaRate', value)}
+                  hint="Cost-of-living adjustment"
+                  min={0}
+                  max={10}
+                />
               </div>
             )}
           </div>
