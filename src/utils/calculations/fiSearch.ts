@@ -283,9 +283,12 @@ export function calculateGoalFIGuidance(
 
   // Lever 2: Additional savings needed
   // Inject extra annual contributions into a synthetic taxable account and test viability.
+  // Contributions stop at the goal FI age (no saving after retirement).
   // Iterate in $6,000/yr ($500/mo) steps up to $300,000/yr ($25,000/mo).
   let additionalSavingsNeeded: GoalFIGuidance['additionalSavingsNeeded'];
   const savingsSearchMax = 300000;
+  const currentYear = new Date().getFullYear();
+  const goalFIYear = currentYear + (goalAge - state.profile.currentAge) - 1;
   for (let extra = 6000; extra <= savingsSearchMax; extra += 6000) {
     const testState: AppState = {
       ...state,
@@ -301,6 +304,7 @@ export function calculateGoalFIGuidance(
             balance: 0,
             costBasis: 0,
             annualContribution: extra,
+            contributionEndYear: goalFIYear,
           },
         ],
       },
