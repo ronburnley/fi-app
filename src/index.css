@@ -681,3 +681,323 @@ input[type="number"] {
     gap: 4px;
   }
 }
+
+/* ================================================
+   HOMEPAGE
+   Full marketing page: hero + how-it-works + features
+   ================================================ */
+
+.homepage-page {
+  position: relative;
+  min-height: 100vh;
+  background: var(--color-bg-primary);
+  overflow-x: hidden;
+}
+
+/* Navigation */
+.homepage-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(10, 10, 11, 0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.homepage-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 14px 24px;
+}
+
+.homepage-nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.homepage-nav-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.homepage-nav-cta {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  padding: 0;
+}
+
+.homepage-nav-cta:hover {
+  opacity: 0.75;
+}
+
+/* Hero Section */
+.homepage-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 24px 80px;
+}
+
+.homepage-hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 760px;
+  width: 100%;
+}
+
+.homepage-welcome-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 100px;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-accent-primary);
+  margin-bottom: 28px;
+  letter-spacing: 0.01em;
+}
+
+.homepage-headline {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1.08;
+  margin: 0 0 24px 0;
+}
+
+.homepage-subheadline {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: clamp(1rem, 2vw, 1.1875rem);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+  line-height: 1.65;
+  margin: 0 0 48px 0;
+  max-width: 540px;
+}
+
+.homepage-cta-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Shared section layout */
+.homepage-section-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.homepage-section-label {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-accent-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin: 0 0 10px 0;
+}
+
+.homepage-section-heading {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: clamp(1.75rem, 3.5vw, 2.375rem);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.025em;
+  margin: 0 0 56px 0;
+  line-height: 1.2;
+}
+
+/* How It Works */
+.homepage-how {
+  padding: 96px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.homepage-how-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
+}
+
+.homepage-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.homepage-step-number {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-accent-primary);
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+}
+
+.homepage-step-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+}
+
+.homepage-step-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.homepage-step-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.homepage-step-desc {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Feature Cards */
+.homepage-features {
+  padding: 96px 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.homepage-features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.homepage-feature-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.homepage-feature-card:hover {
+  border-color: var(--color-border-default);
+  background: #17171a;
+}
+
+.homepage-feature-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent-primary);
+}
+
+.homepage-feature-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.homepage-feature-title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.homepage-feature-desc {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Footer bar */
+.homepage-footer-bar {
+  padding: 24px;
+  border-top: 1px solid var(--color-border-subtle);
+  text-align: center;
+}
+
+/* Homepage responsive */
+@media (max-width: 768px) {
+  .homepage-how-steps {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .homepage-features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .homepage-how,
+  .homepage-features {
+    padding: 64px 0;
+  }
+
+  .homepage-section-heading {
+    margin-bottom: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .homepage-hero {
+    padding: 90px 16px 60px;
+  }
+
+  .homepage-section-inner {
+    padding: 0 16px;
+  }
+
+  .homepage-nav-inner {
+    padding: 12px 16px;
+  }
+}

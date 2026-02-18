@@ -32,10 +32,10 @@ export function WelcomeStep() {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-text-primary mb-2 tracking-tight">
-          Welcome to FI Runway
+          Your Profile
         </h1>
         <p className="text-text-secondary">
-          Answer a few questions and we'll calculate when you can achieve financial independence.
+          Tell us about yourself to get started.
         </p>
       </div>
 
@@ -120,23 +120,6 @@ export function WelcomeStep() {
           </div>
         </div>
       </Card>
-
-      {/* Info callout */}
-      <div className="mt-6 relative overflow-hidden rounded-xl border border-border-subtle bg-bg-secondary p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-full bg-accent-blue/20 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-accent-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-text-primary font-medium mb-1">How it works</p>
-            <p className="text-sm text-text-secondary">
-              Enter your assets, spending, and benefits in the following steps. We'll calculate the earliest age you can achieve financial independence based on your current situation.
-            </p>
-          </div>
-        </div>
-      </div>
 
       <WizardNavigation
         onValidate={() => profile.currentAge > 0}

@@ -1,24 +1,34 @@
+import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider, useApp } from './context/AppContext';
 import { ProjectionProvider } from './context/ProjectionContext';
 import { Header } from './components/layout';
 import { WizardProvider, WizardLayout } from './components/wizard';
-import { LoginPage } from './components/auth';
+import { HomePage } from './components/auth';
 import { MigrationPrompt } from './components/auth/MigrationPrompt';
 import { LoadingScreen } from './components/ui/LoadingScreen';
 
 function AppContent() {
-  const { user, loading: authLoading, isGuest } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { isLoading: dataLoading, needsMigration, acceptMigration, declineMigration } = useApp();
+
+  const [showHomePage, setShowHomePage] = useState<boolean>(() => {
+    return sessionStorage.getItem('fi-runway-entered') !== '1';
+  });
+
+  const handleEnterApp = () => {
+    sessionStorage.setItem('fi-runway-entered', '1');
+    setShowHomePage(false);
+  };
 
   // Show loading while checking auth
   if (authLoading) {
     return <LoadingScreen message="Checking authentication..." />;
   }
 
-  // Show login page if not authenticated and not in guest mode
-  if (!user && !isGuest) {
-    return <LoginPage />;
+  // Show homepage gate (marketing page) until user explicitly enters
+  if (showHomePage) {
+    return <HomePage onEnter={handleEnterApp} />;
   }
 
   // Show loading while fetching data

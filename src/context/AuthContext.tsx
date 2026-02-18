@@ -109,6 +109,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Clear guest mode on sign out - return to landing page
     setIsGuest(false);
     localStorage.removeItem(GUEST_MODE_KEY);
+    // Clear session flag so homepage shows again after logout
+    sessionStorage.removeItem('fi-runway-entered');
   };
 
   const enterGuestMode = useCallback(() => {
