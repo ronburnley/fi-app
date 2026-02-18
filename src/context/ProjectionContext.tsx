@@ -40,9 +40,14 @@ export function ProjectionProvider({ children }: { children: ReactNode }) {
     ]
   );
 
+  // Use achievable FI age directly for projections — don't wait for useEffect sync
+  const effectiveFIAge = achievableFI.achievableFIAge ?? (lifeExpectancy - 1);
   const projections = useMemo(
-    () => calculateProjection(state, whatIf),
-    [state, whatIf]
+    () => calculateProjection({
+      ...state,
+      profile: { ...state.profile, targetFIAge: effectiveFIAge },
+    }, whatIf),
+    [state, whatIf, effectiveFIAge]
   );
 
   const summary = useMemo(
