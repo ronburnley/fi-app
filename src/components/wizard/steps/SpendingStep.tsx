@@ -73,10 +73,12 @@ export function SpendingStep() {
     const mortgage = expenses.home?.mortgage;
     if (!mortgage) return null;
 
+    const yearsElapsedToNow = Math.max(0, currentYear - mortgage.originationYear);
+    const remainingTerm = Math.max(1, mortgage.loanTermYears - yearsElapsedToNow);
     const calculatedPayment = calculateMonthlyPayment(
       mortgage.loanBalance,
       mortgage.interestRate,
-      mortgage.loanTermYears
+      remainingTerm
     );
     const homeEquity = calculateHomeEquity(mortgage.homeValue, mortgage.loanBalance);
     const endYear = calculateMortgageEndYear(mortgage.originationYear, mortgage.loanTermYears);
@@ -90,7 +92,8 @@ export function SpendingStep() {
     if (mortgage.earlyPayoff?.enabled) {
       earlyPayoffAmount = calculateMortgageBalanceForYear(
         mortgage,
-        mortgage.earlyPayoff.payoffYear - 1 // Balance at end of year before payoff
+        mortgage.earlyPayoff.payoffYear - 1, // Balance at end of year before payoff
+        currentYear
       );
     }
 
@@ -169,10 +172,12 @@ export function SpendingStep() {
 
     // Auto-calculate payment if not in manual override mode
     if (!newMortgage.manualPaymentOverride) {
+      const yearsElapsed = Math.max(0, currentYear - newMortgage.originationYear);
+      const remTerm = Math.max(1, newMortgage.loanTermYears - yearsElapsed);
       newMortgage.monthlyPayment = calculateMonthlyPayment(
         newMortgage.loanBalance,
         newMortgage.interestRate,
-        newMortgage.loanTermYears
+        remTerm
       );
     }
 
@@ -188,10 +193,12 @@ export function SpendingStep() {
       updateMortgage({ manualPaymentOverride: true });
     } else {
       // Recalculate payment when switching back to auto
+      const yearsEl = Math.max(0, currentYear - mortgage.originationYear);
+      const rt = Math.max(1, mortgage.loanTermYears - yearsEl);
       const calculatedPayment = calculateMonthlyPayment(
         mortgage.loanBalance,
         mortgage.interestRate,
-        mortgage.loanTermYears
+        rt
       );
       updateMortgage({
         manualPaymentOverride: false,

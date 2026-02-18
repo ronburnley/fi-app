@@ -125,6 +125,7 @@ export function calculateYearExpenses(
   spendingMultiplier: number = 1
 ): YearExpenseResult {
   let totalExpenses = 0;
+  let mortgageAnnual = 0;
   let mortgageBalance: number | undefined = undefined;
   let mortgagePayoffAmount: number | undefined = undefined;
 
@@ -165,7 +166,7 @@ export function calculateYearExpenses(
       const wasAlreadyPaidOff = mortgage.earlyPayoff?.enabled && year > mortgage.earlyPayoff.payoffYear;
 
       // Calculate remaining balance for this year
-      mortgageBalance = calculateMortgageBalanceForYear(mortgage, year);
+      mortgageBalance = calculateMortgageBalanceForYear(mortgage, year, currentYear);
 
       if (isEarlyPayoffYear) {
         // Early payoff year: add remaining balance as one-time expense
@@ -173,9 +174,8 @@ export function calculateYearExpenses(
         mortgageBalance = 0; // After payoff
         // No regular payment this year since we're paying it off
       } else if (!wasAlreadyPaidOff && year <= mortgageEndYear) {
-        // Regular payment year
-        const mortgageAnnual = mortgage.monthlyPayment * 12;
-        totalExpenses += mortgageAnnual;
+        // Regular payment year — tracked separately, excluded from spendingMultiplier
+        mortgageAnnual = mortgage.monthlyPayment * 12;
       }
       // If already paid off (either naturally or early), no payment
     }
@@ -193,9 +193,11 @@ export function calculateYearExpenses(
     }
   }
 
-  // Apply spending adjustment multiplier (but not to mortgage payoff - that's a fixed amount)
+  // Apply spending adjustment multiplier to discretionary expenses only.
+  // Mortgage regular payments and payoff amounts are fixed contractual obligations
+  // and are excluded from the multiplier.
   return {
-    totalExpenses: totalExpenses * spendingMultiplier,
+    totalExpenses: totalExpenses * spendingMultiplier + mortgageAnnual,
     mortgageBalance,
     mortgagePayoffAmount,
   };

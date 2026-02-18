@@ -92,33 +92,41 @@ export function calculateMortgageEndYear(
 }
 
 /**
- * Calculate remaining balance for a specific year given mortgage details
+ * Calculate remaining balance for a specific year given mortgage details.
+ *
+ * `mortgage.loanBalance` is the *current* outstanding principal (as of `currentYear`).
+ * For past/current years we return it as-is; for future years we amortize forward
+ * from that balance over the remaining term.
  */
 export function calculateMortgageBalanceForYear(
   mortgage: MortgageDetails,
-  year: number
+  year: number,
+  currentYear: number
 ): number {
-  const yearsElapsed = year - mortgage.originationYear;
+  const yearsElapsedToNow = currentYear - mortgage.originationYear;
+  const remainingTermYears = mortgage.loanTermYears - yearsElapsedToNow;
+  const yearsFromNow = year - currentYear;
 
-  if (yearsElapsed < 0) {
-    // Before loan started
-    return mortgage.loanBalance;
-  }
-
-  if (yearsElapsed >= mortgage.loanTermYears) {
-    // Loan is paid off
+  // Natural end from origination already reached (or no remaining term)
+  if (year >= mortgage.originationYear + mortgage.loanTermYears || remainingTermYears <= 0) {
     return 0;
   }
 
-  // Check for early payoff (return 0 only AFTER payoff year; payoff year itself needs the balance)
+  // Early payoff: return 0 only AFTER payoff year; payoff year itself needs the balance
   if (mortgage.earlyPayoff?.enabled && year > mortgage.earlyPayoff.payoffYear) {
     return 0;
   }
 
+  // Current year or any past year: return the entered loanBalance as-is
+  if (yearsFromNow <= 0) {
+    return mortgage.loanBalance;
+  }
+
+  // Future year: amortize forward from current balance over remaining term
   return calculateRemainingBalance(
     mortgage.loanBalance,
     mortgage.interestRate,
-    mortgage.loanTermYears,
-    yearsElapsed
+    remainingTermYears,
+    yearsFromNow
   );
 }

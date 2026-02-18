@@ -169,14 +169,19 @@ describe('Mortgage Calculations', () => {
       manualPaymentOverride: false,
     };
 
-    it('calculates balance for year in middle of loan', () => {
-      const balance = calculateMortgageBalanceForYear(mortgage, 2025);
-      expect(balance).toBeGreaterThan(350000);
+    it('returns loanBalance for current year', () => {
+      const balance = calculateMortgageBalanceForYear(mortgage, 2026, 2026);
+      expect(balance).toBe(400000);
+    });
+
+    it('calculates declining balance for future year', () => {
+      const balance = calculateMortgageBalanceForYear(mortgage, 2031, 2026);
+      expect(balance).toBeGreaterThan(0);
       expect(balance).toBeLessThan(400000);
     });
 
     it('returns 0 after loan term', () => {
-      const balance = calculateMortgageBalanceForYear(mortgage, 2051);
+      const balance = calculateMortgageBalanceForYear(mortgage, 2051, 2026);
       expect(balance).toBe(0);
     });
 
@@ -186,10 +191,10 @@ describe('Mortgage Calculations', () => {
         earlyPayoff: { enabled: true, payoffYear: 2030 },
       };
       // Payoff year itself returns the remaining balance (needed for lump-sum expense)
-      const payoffYearBalance = calculateMortgageBalanceForYear(mortgageWithPayoff, 2030);
+      const payoffYearBalance = calculateMortgageBalanceForYear(mortgageWithPayoff, 2030, 2026);
       expect(payoffYearBalance).toBeGreaterThan(0);
       // Year after payoff returns 0
-      expect(calculateMortgageBalanceForYear(mortgageWithPayoff, 2031)).toBe(0);
+      expect(calculateMortgageBalanceForYear(mortgageWithPayoff, 2031, 2026)).toBe(0);
     });
   });
 });
@@ -1997,5 +2002,158 @@ describe('Goal FI Guidance', () => {
 
     // Should be ahead_of_goal or on_track (since latest FI is very late)
     expect(['on_track', 'ahead_of_goal']).toContain(guidance.status);
+  });
+});
+
+// ==================== Mortgage Anchor Regression (Bug 1) ====================
+
+describe('calculateMortgageBalanceForYear uses loanBalance as current-year anchor', () => {
+  // Originated 2015, current outstanding $320K, 30-yr term, currentYear=2026
+  // yearsElapsedToNow=11, remainingTerm=19
+  const mortgage = {
+    homeValue: 500000,
+    loanBalance: 320000,
+    interestRate: 0.065,
+    loanTermYears: 30 as const,
+    originationYear: 2015,
+    monthlyPayment: 2200,
+    manualPaymentOverride: false,
+  };
+  const currentYear = 2026;
+
+  it('returns exact loanBalance for current year', () => {
+    expect(calculateMortgageBalanceForYear(mortgage, currentYear, currentYear)).toBe(320000);
+  });
+
+  it('returns loanBalance for any past year', () => {
+    expect(calculateMortgageBalanceForYear(mortgage, 2023, currentYear)).toBe(320000);
+  });
+
+  it('returns positive declining balance for future year', () => {
+    const b = calculateMortgageBalanceForYear(mortgage, 2031, currentYear);
+    expect(b).toBeGreaterThan(0);
+    expect(b).toBeLessThan(320000);
+  });
+
+  it('returns 0 when future year exceeds remaining term', () => {
+    // Natural end = 2015 + 30 = 2045; any year >= 2045 returns 0
+    expect(calculateMortgageBalanceForYear(mortgage, 2046, currentYear)).toBe(0);
+  });
+});
+
+// ==================== Mortgage Multiplier Exclusion (Bug 2) ====================
+
+describe('mortgage regular payments excluded from spendingMultiplier scaling', () => {
+  const currentYear = new Date().getFullYear();
+  // FI at currentAge so no employment income — expenses are the only thing being tested
+  const state = createTestState({
+    profile: { currentAge: 55, targetFIAge: 55, lifeExpectancy: 80, state: 'TX', filingStatus: 'single' },
+    assets: {
+      accounts: [
+        { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 5000000, costBasis: 3000000 },
+      ],
+    },
+    income: { retirementIncomes: [] },
+    socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+    expenses: {
+      categories: [
+        {
+          id: 'exp-1',
+          name: 'Living',
+          annualAmount: 60000,
+          inflationAdjusted: false, // fixed so inflation doesn't muddy the check
+          category: 'living',
+        },
+      ],
+      home: {
+        propertyTax: 0,
+        insurance: 0,
+        mortgage: {
+          homeValue: 400000,
+          loanBalance: 300000,
+          interestRate: 0.065,
+          loanTermYears: 30 as const,
+          originationYear: currentYear - 5,
+          monthlyPayment: 2000,       // $24,000/yr
+          manualPaymentOverride: true,
+          earlyPayoff: undefined,
+        },
+      },
+    },
+    assumptions: {
+      investmentReturn: 0.06,
+      inflationRate: 0,
+      traditionalTaxRate: 0.22,
+      capitalGainsTaxRate: 0.15,
+      rothTaxRate: 0,
+      withdrawalOrder: ['taxable', 'traditional', 'roth'],
+      penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+    },
+  });
+
+  it('year 1 expenses equal living + mortgage with no multiplier', () => {
+    const projection = calculateProjection(state);
+    // 60000 (living) + 24000 (mortgage) = 84000
+    expect(projection[0].expenses).toBeCloseTo(84000, 0);
+  });
+
+  it('year 1 expenses: living scales but mortgage does not (1.5x multiplier)', () => {
+    const whatIf: WhatIfAdjustments = { spendingAdjustment: 0.5, ssStartAge: 67 };
+    const projection = calculateProjection(state, whatIf);
+    // 60000 * 1.5 + 24000 = 114000 (NOT 84000 * 1.5 = 126000)
+    expect(projection[0].expenses).toBeCloseTo(114000, 0);
+  });
+});
+
+// ==================== additionalSavingsNeeded Simulation (Bug 3) ====================
+
+describe('additionalSavingsNeeded uses simulation (accounts for compounding)', () => {
+  // State that is not achievable at any age
+  const notAchievableState = createTestState({
+    profile: { currentAge: 60, targetFIAge: 60, lifeExpectancy: 90, state: 'TX', filingStatus: 'single' },
+    assets: {
+      accounts: [
+        { id: 'taxable-1', name: 'Taxable', type: 'taxable', owner: 'self', balance: 50000, costBasis: 50000 },
+      ],
+    },
+    income: { retirementIncomes: [] },
+    socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+    expenses: {
+      categories: [
+        { id: 'exp-1', name: 'Living', annualAmount: 120000, inflationAdjusted: false, category: 'living' },
+      ],
+    },
+    assumptions: {
+      investmentReturn: 0.06,
+      inflationRate: 0,
+      traditionalTaxRate: 0.22,
+      capitalGainsTaxRate: 0.15,
+      rothTaxRate: 0,
+      withdrawalOrder: ['taxable', 'traditional', 'roth'],
+      penaltySettings: { earlyWithdrawalPenaltyRate: 0.10, hsaEarlyPenaltyRate: 0.20, enableRule55: false },
+    },
+  });
+
+  it('result is not_achievable (precondition for shortfallGuidance)', () => {
+    const result = calculateAchievableFIAge(notAchievableState);
+    expect(result.confidenceLevel).toBe('not_achievable');
+    expect(result.shortfallGuidance).toBeDefined();
+  });
+
+  it('additionalSavingsNeeded is a multiple of 6000 (simulation step size)', () => {
+    const result = calculateAchievableFIAge(notAchievableState);
+    expect(result.shortfallGuidance!.additionalSavingsNeeded % 6000).toBe(0);
+  });
+
+  it('additionalSavingsNeeded is strictly positive', () => {
+    const result = calculateAchievableFIAge(notAchievableState);
+    expect(result.shortfallGuidance!.additionalSavingsNeeded).toBeGreaterThan(0);
+  });
+
+  it('additionalSavingsNeeded does not use the old years-to-LE division formula (confirmed by being a multiple of 6000)', () => {
+    // The old formula: Math.round(totalShortfall / yearsToLE) — almost never a multiple of 6000.
+    // The simulation approach always returns a multiple of 6000 (step size).
+    const result = calculateAchievableFIAge(notAchievableState);
+    expect(result.shortfallGuidance!.additionalSavingsNeeded % 6000).toBe(0);
   });
 });

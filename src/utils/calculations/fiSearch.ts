@@ -105,7 +105,7 @@ function calculateShortfallGuidance(
   const latestFIAge = lifeExpectancy - 1;
 
   // Find when money runs out (test at latest possible FI = life expectancy - 1).
-  const { projections, shortfallYear } = evaluateFIAge(state, latestFIAge, whatIf);
+  const { shortfallYear } = evaluateFIAge(state, latestFIAge, whatIf);
   const runsOutAtAge = shortfallYear ? shortfallYear.age : lifeExpectancy;
 
   // Search for spending reduction that makes FI achievable at lifeExpectancy - 1
@@ -127,13 +127,38 @@ function calculateShortfallGuidance(
     }
   }
 
-  // Estimate additional savings needed (annual) using simple approach:
-  // years until life expectancy * additional savings = roughly the shortfall
-  const yearsToLE = lifeExpectancy - state.profile.currentAge;
-  const shortfallAmount = projections
-    .filter((p) => p.isShortfall)
-    .reduce((sum, p) => sum + p.unmetNeed, 0);
-  const additionalSavingsNeeded = yearsToLE > 0 ? Math.round(shortfallAmount / yearsToLE) : 0;
+  // Simulation: inject extra annual savings until FI is viable at LE-1.
+  // Same approach as calculateGoalFIGuidance — correctly accounts for compounding.
+  const currentYear = new Date().getFullYear();
+  const latestFIYear = currentYear + (latestFIAge - state.profile.currentAge) - 1;
+  const savingsSearchMax = 300000;
+  let additionalSavingsNeeded = 0;
+  for (let extra = 6000; extra <= savingsSearchMax; extra += 6000) {
+    const testState: AppState = {
+      ...state,
+      assets: {
+        ...state.assets,
+        accounts: [
+          ...state.assets.accounts,
+          {
+            id: '__shortfall_extra_savings',
+            name: 'Extra Savings',
+            type: 'taxable' as const,
+            owner: 'self' as const,
+            balance: 0,
+            costBasis: 0,
+            annualContribution: extra,
+            contributionEndYear: latestFIYear,
+          },
+        ],
+      },
+    };
+    if (isFIAgeViable(testState, latestFIAge, whatIf)) {
+      additionalSavingsNeeded = extra;
+      break;
+    }
+  }
+  if (additionalSavingsNeeded === 0) additionalSavingsNeeded = savingsSearchMax;
 
   return {
     runsOutAtAge,

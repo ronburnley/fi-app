@@ -68,6 +68,8 @@ export interface SpouseSocialSecurity {
   include: boolean;
   monthlyBenefit: number;
   startAge: 62 | 67 | 70;
+  // No colaRate: spouse SS uses the primary SocialSecurity.colaRate —
+  // SSA COLA is a uniform macro adjustment applied to all benefits.
 }
 
 export interface SocialSecurity {
@@ -202,10 +204,10 @@ export interface YearProjection {
   age: number;
   phase: FinancialPhase;          // 'accumulating' | 'fi'
   expenses: number;
-  income: number;                 // SS + pension + retirement income streams
+  income: number;                 // SS + pension + retirement streams + life event income credits
   ssIncome: number;               // Social Security income only
   pensionIncome: number;          // Pension income only
-  employmentIncome: number;       // Net after-tax employment income
+  employmentIncome: number;       // Gross employment income (before tax; see employmentTax)
   employmentTax: number;          // Tax deducted from gross employment income
   contributions: number;          // Added to retirement accounts
   retirementIncome: number;       // Non-SS/pension retirement streams
