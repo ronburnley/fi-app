@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
-export function LoginPage() {
+interface LoginPageProps {
+  onPrivacyClick?: () => void;
+}
+
+export function LoginPage({ onPrivacyClick }: LoginPageProps) {
   const { signInWithGoogle, enterGuestMode } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +159,17 @@ export function LoginPage() {
         {/* Disclaimer */}
         <p className="landing-disclaimer">
           FI Runway is an educational planning tool, not a financial advisor.
+          {onPrivacyClick && (
+            <>
+              {' '}
+              <button
+                onClick={onPrivacyClick}
+                className="underline underline-offset-2 hover:text-text-muted transition-colors"
+              >
+                Privacy & Security
+              </button>
+            </>
+          )}
         </p>
       </div>
     </div>

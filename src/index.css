@@ -74,6 +74,13 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* Privacy page list items */
+.privacy-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 /* Custom FI Slider Styles */
 .fi-slider {
   -webkit-appearance: none;
