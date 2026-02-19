@@ -39,18 +39,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(DEV_BYPASS_AUTH ? MOCK_USER : null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(!DEV_BYPASS_AUTH);
-  const [isGuest, setIsGuest] = useState(() => {
-    // Check for reset parameter to clear guest mode
-    if (typeof window !== 'undefined' && window.location.search.includes('reset')) {
-      localStorage.removeItem(GUEST_MODE_KEY);
-      // Clean up URL
-      window.history.replaceState({}, '', window.location.pathname);
-      return false;
-    }
-    // Initialize from localStorage (but DEV_BYPASS_AUTH takes precedence)
-    if (DEV_BYPASS_AUTH) return false;
-    return localStorage.getItem(GUEST_MODE_KEY) === 'true';
-  });
+  // Always start as non-guest so users see the login page (with disclaimers) on every visit.
+  // Guest data remains in localStorage and loads when the user clicks "Get Started".
+  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     // Skip auth check in dev bypass mode
