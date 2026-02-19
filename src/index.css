@@ -631,24 +631,72 @@ input[type="number"] {
   cursor: not-allowed;
 }
 
-/* Footer */
-.landing-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 32px;
-  font-family: 'Outfit', system-ui, sans-serif;
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  text-align: center;
-  line-height: 1.5;
+/* Trust section */
+.landing-trust {
+  width: 100%;
+  padding: 16px 20px;
+  margin-bottom: 32px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
 }
 
-.landing-footer-icon {
+.landing-trust-header {
   display: flex;
   align-items: center;
-  opacity: 0.7;
+  gap: 8px;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+}
+
+.landing-trust-header svg {
+  color: var(--color-accent-primary);
+  opacity: 0.8;
+}
+
+.landing-trust-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.landing-trust-list li {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  padding-left: 20px;
+  position: relative;
+}
+
+.landing-trust-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2322c55e' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M5 13l4 4L19 7'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.6;
+}
+
+/* Disclaimer */
+.landing-disclaimer {
+  margin-top: 32px;
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  text-align: center;
+  opacity: 0.6;
+  line-height: 1.5;
 }
 
 @media (max-width: 480px) {
@@ -673,11 +721,11 @@ input[type="number"] {
 
   .landing-tagline {
     font-size: 1rem;
-    margin-bottom: 32px;
+    margin-bottom: 24px;
   }
 
-  .landing-footer {
-    flex-direction: column;
-    gap: 4px;
+  .landing-trust {
+    padding: 12px 16px;
+    margin-bottom: 24px;
   }
 }

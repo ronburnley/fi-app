@@ -40,6 +40,10 @@ export function ResultsStep() {
       </div>
 
       <WizardNavigation />
+
+      <p className="text-xs text-text-muted opacity-70 text-center mt-6 mb-2">
+        FI Runway is an educational planning tool, not a financial advisor. Projections are estimates based on your inputs and assumptions. Consult a qualified professional before making financial decisions.
+      </p>
     </div>
   );
 }

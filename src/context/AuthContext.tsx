@@ -24,6 +24,7 @@ interface AuthContextType {
   isGuest: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   enterGuestMode: () => void;
   exitGuestMode: () => void;
 }
@@ -111,6 +112,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem(GUEST_MODE_KEY);
   };
 
+  const deleteAccount = async () => {
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) {
+      console.error('Delete account error:', error);
+      throw error;
+    }
+    // Sign out and clear local state after server-side deletion
+    await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setIsGuest(false);
+    localStorage.removeItem(GUEST_MODE_KEY);
+  };
+
   const enterGuestMode = useCallback(() => {
     setIsGuest(true);
     localStorage.setItem(GUEST_MODE_KEY, 'true');
@@ -129,6 +144,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isGuest,
       signInWithGoogle,
       signOut,
+      deleteAccount,
       enterGuestMode,
       exitGuestMode,
     }}>

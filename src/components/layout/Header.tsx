@@ -1,18 +1,19 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button, FIStatusIndicator } from '../ui';
-import { SignInModal } from '../auth';
+import { SignInModal, DeleteAccountModal } from '../auth';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWizard } from '../wizard/WizardContext';
 import { useProjectionContext } from '../../context/ProjectionContext';
 
 export function Header() {
-  const { syncStatus } = useApp();
+  const { state, syncStatus } = useApp();
   const { user, signOut, isGuest } = useAuth();
   const { currentStep } = useWizard();
   const { achievableFI } = useProjectionContext();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Show indicator after step 1 (once user has entered assets in step 2+)
@@ -38,6 +39,20 @@ export function Header() {
   const handleSignInToSync = () => {
     setShowSignInModal(true);
   };
+
+  const handleExportData = useCallback(() => {
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fi-runway-plan-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [state]);
 
   // Get user initials for avatar
   const getInitials = () => {
@@ -89,21 +104,32 @@ export function Header() {
       {/* Right: Sync Status + User Menu (or Sign In for guests) */}
       <div className="header-right">
         {isGuest ? (
-          /* Guest mode: Show "Sign in to sync" link */
-          <button
-            onClick={handleSignInToSync}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-accent-blue hover:text-accent-blue/80 hover:bg-bg-tertiary rounded-lg transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <span>Sign in to sync</span>
-          </button>
+          /* Guest mode: Show export button + "Sign in to sync" link */
+          <>
+            <button
+              onClick={handleExportData}
+              title="Export data"
+              className="flex items-center justify-center w-8 h-8 text-text-muted hover:text-text-secondary hover:bg-bg-tertiary rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </button>
+            <button
+              onClick={handleSignInToSync}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-accent-blue hover:text-accent-blue/80 hover:bg-bg-tertiary rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+              <span>Sign in to sync</span>
+            </button>
+          </>
         ) : (
           /* Authenticated: Show sync status + user menu */
           <>
@@ -197,6 +223,29 @@ export function Header() {
                     <Button
                       variant="ghost"
                       className="w-full justify-start px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-none"
+                      onClick={() => { setShowUserMenu(false); handleExportData(); }}
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      Export data
+                    </Button>
+                  </div>
+                  <div className="border-t border-border-subtle" />
+                  <div className="py-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start px-4 py-2 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded-none"
                       onClick={handleSignOut}
                     >
                       <svg
@@ -215,6 +264,29 @@ export function Header() {
                       Sign out
                     </Button>
                   </div>
+                  <div className="border-t border-border-subtle" />
+                  <div className="py-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start px-4 py-2 text-accent-danger hover:text-accent-danger hover:bg-accent-danger/10 rounded-none"
+                      onClick={() => { setShowUserMenu(false); setShowDeleteModal(true); }}
+                    >
+                      <svg
+                        className="w-4 h-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                      Delete account
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -223,6 +295,7 @@ export function Header() {
       </div>
 
       {showSignInModal && <SignInModal onClose={() => setShowSignInModal(false)} />}
+      {showDeleteModal && <DeleteAccountModal onClose={() => setShowDeleteModal(false)} />}
     </header>
   );
 }

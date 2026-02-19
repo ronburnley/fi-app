@@ -53,6 +53,22 @@ export function LoginPage() {
           Calculate your path to financial independence
         </p>
 
+        {/* Trust section */}
+        <div className="landing-trust">
+          <div className="landing-trust-header">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+            <span>Your data is safe</span>
+          </div>
+          <ul className="landing-trust-list">
+            <li>No bank account linking — you enter estimates, never credentials</li>
+            <li>Encrypted at rest and in transit</li>
+            <li>We never sell or share your data</li>
+            <li>Guest mode keeps everything in your browser</li>
+          </ul>
+        </div>
+
         {/* Error message */}
         {error && (
           <div className="landing-error">
@@ -136,14 +152,9 @@ export function LoginPage() {
           </button>
         </div>
 
-        {/* Footer hint */}
-        <p className="landing-footer">
-          <span className="landing-footer-icon">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </span>
-          Your data stays private on this device. Sign in to sync across devices.
+        {/* Disclaimer */}
+        <p className="landing-disclaimer">
+          FI Runway is an educational planning tool, not a financial advisor.
         </p>
       </div>
     </div>

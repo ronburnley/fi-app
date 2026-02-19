@@ -34,3 +34,12 @@ $$;
 create trigger financial_plans_updated_at
   before update on public.financial_plans
   for each row execute function update_updated_at();
+
+-- Self-service account deletion
+-- Deletes the caller's financial plans and auth record.
+-- Must be deployed manually via Supabase SQL Editor.
+create or replace function public.delete_my_account()
+returns void language sql security definer set search_path = public as $$
+  delete from public.financial_plans where user_id = auth.uid();
+  delete from auth.users where id = auth.uid();
+$$;
