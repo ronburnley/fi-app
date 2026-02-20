@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { RetirementIncome } from '../../types';
-import { Input, CurrencyInput, Button, Toggle } from '../ui';
+import type { RetirementIncome, InputFrequency } from '../../types';
+import { Input, CurrencyInputWithFrequency, Button, Toggle } from '../ui';
 
 interface RetirementIncomeEditFormProps {
   income?: RetirementIncome;
@@ -17,6 +17,7 @@ export function RetirementIncomeEditForm({
 }: RetirementIncomeEditFormProps) {
   const [name, setName] = useState(income?.name ?? '');
   const [annualAmount, setAnnualAmount] = useState(income?.annualAmount ?? 0);
+  const [frequency, setFrequency] = useState<InputFrequency>(income?.inputFrequency ?? 'monthly');
   const [startAge, setStartAge] = useState(income?.startAge ?? 55);
   const [hasEndAge, setHasEndAge] = useState(income?.endAge !== undefined);
   const [endAge, setEndAge] = useState(income?.endAge ?? 75);
@@ -36,6 +37,7 @@ export function RetirementIncomeEditForm({
       endAge: hasEndAge ? endAge : undefined,
       inflationAdjusted,
       taxable,
+      inputFrequency: frequency,
     });
   };
 
@@ -56,11 +58,13 @@ export function RetirementIncomeEditForm({
             placeholder="e.g., Consulting, Rental income"
           />
 
-          <CurrencyInput
-            label="Annual Amount"
-            value={annualAmount}
-            onChange={setAnnualAmount}
-            hint="Gross annual income"
+          <CurrencyInputWithFrequency
+            label="Amount"
+            annualValue={annualAmount}
+            onAnnualChange={setAnnualAmount}
+            frequency={frequency}
+            onFrequencyChange={setFrequency}
+            hint="Gross income"
           />
 
           <div className="grid grid-cols-2 gap-3">

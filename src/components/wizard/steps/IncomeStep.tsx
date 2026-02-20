@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { RetirementIncomeEditForm } from '../../inputs/RetirementIncomeEditForm';
-import { CurrencyInput, PercentInput, Toggle, Input } from '../../ui';
-import type { EmploymentIncome, RetirementIncome, Income } from '../../../types';
+import { CurrencyInputWithFrequency, PercentInput, Toggle, Input } from '../../ui';
+import type { EmploymentIncome, RetirementIncome, Income, InputFrequency } from '../../../types';
 
 function formatCurrencyCompact(n: number): string {
   return n.toLocaleString('en-US', {
@@ -68,7 +68,7 @@ export function IncomeStep() {
   };
 
   // Update self employment field
-  const updateSelfField = (field: keyof EmploymentIncome, value: number) => {
+  const updateSelfField = (field: keyof EmploymentIncome, value: number | InputFrequency) => {
     const updated = { ...selfEmployment, [field]: value };
     setSelfEmployment(updated);
     if (hasEmployment) {
@@ -77,7 +77,7 @@ export function IncomeStep() {
   };
 
   // Update spouse employment field
-  const updateSpouseField = (field: keyof EmploymentIncome, value: number) => {
+  const updateSpouseField = (field: keyof EmploymentIncome, value: number | InputFrequency) => {
     const updated = { ...spouseEmployment, [field]: value };
     setSpouseEmployment(updated);
     if (hasSpouseEmployment) {
@@ -139,10 +139,12 @@ export function IncomeStep() {
 
             {hasEmployment && (
               <div className="mt-4 space-y-4 pl-0">
-                <CurrencyInput
-                  label="Annual Gross Income"
-                  value={selfEmployment.annualGrossIncome}
-                  onChange={(v) => updateSelfField('annualGrossIncome', v)}
+                <CurrencyInputWithFrequency
+                  label="Gross Income"
+                  annualValue={selfEmployment.annualGrossIncome}
+                  onAnnualChange={(v) => updateSelfField('annualGrossIncome', v)}
+                  frequency={selfEmployment.inputFrequency ?? 'monthly'}
+                  onFrequencyChange={(f) => updateSelfField('inputFrequency', f)}
                   hint="Before taxes"
                 />
                 <PercentInput
@@ -176,10 +178,12 @@ export function IncomeStep() {
 
               {hasSpouseEmployment && (
                 <div className="mt-4 space-y-4 pl-0">
-                  <CurrencyInput
-                    label="Spouse Annual Gross"
-                    value={spouseEmployment.annualGrossIncome}
-                    onChange={(v) => updateSpouseField('annualGrossIncome', v)}
+                  <CurrencyInputWithFrequency
+                    label="Spouse Gross Income"
+                    annualValue={spouseEmployment.annualGrossIncome}
+                    onAnnualChange={(v) => updateSpouseField('annualGrossIncome', v)}
+                    frequency={spouseEmployment.inputFrequency ?? 'monthly'}
+                    onFrequencyChange={(f) => updateSpouseField('inputFrequency', f)}
                     hint="Before taxes"
                   />
                   <PercentInput
@@ -299,7 +303,9 @@ export function IncomeStep() {
 
                 {/* Amount */}
                 <span className="text-sm font-medium text-text-primary tabular-nums flex-shrink-0">
-                  {formatCurrencyCompact(ri.annualAmount)}/yr
+                  {ri.inputFrequency === 'monthly'
+                    ? `${formatCurrencyCompact(Math.round(ri.annualAmount / 12))}/mo`
+                    : `${formatCurrencyCompact(ri.annualAmount)}/yr`}
                 </span>
               </button>
             ))

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { ExpenseEditForm } from '../../inputs/ExpenseEditForm';
-import { CurrencyInput, Input, PercentInput, Toggle, Select } from '../../ui';
+import { CurrencyInput, CurrencyInputWithFrequency, Input, PercentInput, Toggle, Select } from '../../ui';
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_COLORS } from '../../../constants/defaults';
 import {
   calculateMonthlyPayment,
@@ -360,7 +360,9 @@ export function SpendingStep() {
 
                   {/* Amount */}
                   <span className="text-sm font-medium text-text-primary tabular-nums flex-shrink-0">
-                    {formatCurrencyCompact(expense.annualAmount)}
+                    {expense.inputFrequency === 'monthly'
+                      ? `${formatCurrencyCompact(Math.round(expense.annualAmount / 12))}/mo`
+                      : `${formatCurrencyCompact(expense.annualAmount)}/yr`}
                   </span>
                 </button>
               );
@@ -402,18 +404,20 @@ export function SpendingStep() {
           {hasHome && expenses.home && (
             <div className="mt-4 space-y-4">
               {/* Property Tax & Insurance */}
-              <div className="grid grid-cols-2 gap-3">
-                <CurrencyInput
+              <div className="space-y-4">
+                <CurrencyInputWithFrequency
                   label="Property Tax"
-                  value={expenses.home.propertyTax}
-                  onChange={(value) => updateHomeExpense({ propertyTax: value })}
-                  hint="Annual amount"
+                  annualValue={expenses.home.propertyTax}
+                  onAnnualChange={(value) => updateHomeExpense({ propertyTax: value })}
+                  frequency={expenses.home.propertyTaxFrequency ?? 'annual'}
+                  onFrequencyChange={(f) => updateHomeExpense({ propertyTaxFrequency: f })}
                 />
-                <CurrencyInput
+                <CurrencyInputWithFrequency
                   label="Homeowners Insurance"
-                  value={expenses.home.insurance}
-                  onChange={(value) => updateHomeExpense({ insurance: value })}
-                  hint="Annual premium"
+                  annualValue={expenses.home.insurance}
+                  onAnnualChange={(value) => updateHomeExpense({ insurance: value })}
+                  frequency={expenses.home.insuranceFrequency ?? 'annual'}
+                  onFrequencyChange={(f) => updateHomeExpense({ insuranceFrequency: f })}
                 />
               </div>
 

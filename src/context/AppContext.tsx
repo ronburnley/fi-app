@@ -20,6 +20,8 @@ import {
   migrateInflation,
   needsSurplusAccountMigration,
   migrateSurplusAccount,
+  needsFrequencyMigration,
+  migrateInputFrequency,
 } from '../utils/migration';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase';
@@ -371,6 +373,18 @@ function migrateData(data: AppState): AppState {
       migratedAssumptions as Parameters<typeof migrateSurplusAccount>[0],
       migratedAssets?.accounts || []
     );
+  }
+
+  // Stamp inputFrequency: 'annual' on existing items that lack it
+  if (needsFrequencyMigration({ income: migratedIncome, assets: migratedAssets, expenses: migratedExpenses })) {
+    const frequencyResult = migrateInputFrequency({
+      income: migratedIncome,
+      assets: migratedAssets,
+      expenses: migratedExpenses,
+    });
+    if (frequencyResult.income) migratedIncome = frequencyResult.income;
+    if (frequencyResult.assets) migratedAssets = frequencyResult.assets;
+    if (frequencyResult.expenses) migratedExpenses = frequencyResult.expenses;
   }
 
   return mergeWithDefaults({

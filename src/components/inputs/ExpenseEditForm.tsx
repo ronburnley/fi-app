@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Expense, ExpenseCategory } from '../../types';
-import { Input, CurrencyInput, Button, Select } from '../ui';
+import type { Expense, ExpenseCategory, InputFrequency } from '../../types';
+import { Input, CurrencyInputWithFrequency, Button, Select } from '../ui';
 import { EXPENSE_CATEGORY_LABELS } from '../../constants/defaults';
 
 interface ExpenseEditFormProps {
@@ -15,6 +15,7 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
 
   const [name, setName] = useState(expense?.name ?? '');
   const [annualAmount, setAnnualAmount] = useState(expense?.annualAmount ?? 0);
+  const [frequency, setFrequency] = useState<InputFrequency>(expense?.inputFrequency ?? 'monthly');
   const [category, setCategory] = useState<ExpenseCategory>(expense?.category ?? 'living');
   const [isFixedCost, setIsFixedCost] = useState(expense?.inflationAdjusted === false);
   const [hasStartYear, setHasStartYear] = useState(!!expense?.startYear);
@@ -34,6 +35,7 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
       inflationAdjusted: isFixedCost ? false : undefined,
       startYear: hasStartYear ? startYear : undefined,
       endYear: hasEndYear ? endYear : undefined,
+      inputFrequency: frequency,
     });
   };
 
@@ -68,20 +70,22 @@ export function ExpenseEditForm({ expense, onSave, onDelete, onCancel }: Expense
             placeholder="e.g., Groceries, Health Insurance, Travel"
           />
 
-          {/* Amount & Category */}
-          <div className="grid grid-cols-2 gap-3">
-            <CurrencyInput
-              label="Annual Amount"
-              value={annualAmount}
-              onChange={setAnnualAmount}
-            />
-            <Select
-              label="Category"
-              value={category}
-              onChange={(value) => setCategory(value as ExpenseCategory)}
-              options={categoryOptions}
-            />
-          </div>
+          {/* Amount */}
+          <CurrencyInputWithFrequency
+            label="Amount"
+            annualValue={annualAmount}
+            onAnnualChange={setAnnualAmount}
+            frequency={frequency}
+            onFrequencyChange={setFrequency}
+          />
+
+          {/* Category */}
+          <Select
+            label="Category"
+            value={category}
+            onChange={(value) => setCategory(value as ExpenseCategory)}
+            options={categoryOptions}
+          />
 
           {/* Duration toggles */}
           <div className="space-y-3">

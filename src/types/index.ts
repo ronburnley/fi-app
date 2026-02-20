@@ -15,10 +15,13 @@ export interface StateTaxInfo {
   capitalGainsRate: number; // Rate for capital gains (taxable account withdrawals)
 }
 
+export type InputFrequency = 'monthly' | 'annual';
+
 export interface Pension {
   annualBenefit: number;
   startAge: number;
   colaRate?: number;  // Optional COLA rate, stored as decimal (0.02 = 2%)
+  inputFrequency?: InputFrequency;
 }
 
 // v3: Flexible asset types
@@ -37,6 +40,7 @@ export interface Asset {
   annualContribution?: number;       // Annual contribution amount (e.g. 23000)
   contributionStartYear?: number;    // undefined = current year
   contributionEndYear?: number;      // undefined = contributes every year
+  inputFrequency?: InputFrequency;   // UI display preference for contribution amount
 }
 
 export interface Assets {
@@ -91,6 +95,7 @@ export interface Expense {
   endYear?: number;        // undefined = perpetual (through life expectancy)
   inflationAdjusted?: boolean;  // default true; false = fixed cost (no inflation)
   category: ExpenseCategory;
+  inputFrequency?: InputFrequency;
 }
 
 export interface MortgageDetails {
@@ -122,6 +127,8 @@ export interface HomeExpense {
   mortgage?: MortgageDetails;
   propertyTax: number;         // Annual amount
   insurance: number;           // Annual homeowners insurance
+  propertyTaxFrequency?: InputFrequency;
+  insuranceFrequency?: InputFrequency;
 }
 
 export interface Expenses {
@@ -148,6 +155,7 @@ export interface EmploymentIncome {
   annualGrossIncome: number;      // Pre-tax salary
   effectiveTaxRate: number;       // Combined fed+state (decimal, e.g., 0.25)
   annualGrowthRate?: number;      // Annual raise rate (decimal, e.g., 0.03 = 3%). Defaults to 0.
+  inputFrequency?: InputFrequency;
 }
 
 // Retirement income streams beyond SS/pension (consulting, rentals, etc.)
@@ -159,6 +167,7 @@ export interface RetirementIncome {
   endAge?: number;                // undefined = perpetual
   inflationAdjusted: boolean;
   taxable: boolean;
+  inputFrequency?: InputFrequency;
 }
 
 // Financial phase indicator for each projection year

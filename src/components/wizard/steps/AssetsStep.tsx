@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useApp } from '../../../context/AppContext';
 import { WizardNavigation } from '../WizardNavigation';
 import { AssetEditForm } from '../../inputs/AssetEditForm';
-import { CurrencyInput, Toggle, Input, PercentInput } from '../../ui';
+import { CurrencyInputWithFrequency, Toggle, Input, PercentInput } from '../../ui';
 import { ACCOUNT_TYPE_LABELS, ACCOUNT_TYPE_COLORS } from '../../../constants/defaults';
-import type { Asset } from '../../../types';
+import type { Asset, InputFrequency } from '../../../types';
 
 function formatCurrencyCompact(n: number): string {
   return n.toLocaleString('en-US', {
@@ -59,7 +59,7 @@ export function AssetsStep() {
     }
   };
 
-  const updatePension = (field: string, value: number) => {
+  const updatePension = (field: string, value: number | InputFrequency) => {
     dispatch({
       type: 'UPDATE_ASSETS',
       payload: {
@@ -155,7 +155,9 @@ export function AssetsStep() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {asset.annualContribution && asset.annualContribution > 0 && (
                     <span className="text-xs font-medium text-emerald-400/80 tabular-nums">
-                      +{formatCurrencyCompact(asset.annualContribution)}/yr
+                      +{asset.inputFrequency === 'monthly'
+                        ? `${formatCurrencyCompact(Math.round(asset.annualContribution / 12))}/mo`
+                        : `${formatCurrencyCompact(asset.annualContribution)}/yr`}
                     </span>
                   )}
                   <span className="text-sm font-medium text-text-primary tabular-nums">
@@ -197,24 +199,24 @@ export function AssetsStep() {
 
             {hasPension && assets.pension && (
               <div className="mt-4 space-y-4">
-                {/* Primary Inputs: 2-column grid */}
-                <div className="grid grid-cols-2 gap-3">
-                  <CurrencyInput
-                    label="Annual Benefit"
-                    value={assets.pension.annualBenefit}
-                    onChange={(value) => updatePension('annualBenefit', value)}
-                    hint="Before taxes"
-                  />
-                  <Input
-                    label="Start Age"
-                    type="number"
-                    value={assets.pension.startAge}
-                    onChange={(e) => updatePension('startAge', parseInt(e.target.value) || 65)}
-                    min={50}
-                    max={100}
-                    hint="When payments begin"
-                  />
-                </div>
+                {/* Primary Inputs */}
+                <CurrencyInputWithFrequency
+                  label="Benefit Amount"
+                  annualValue={assets.pension.annualBenefit}
+                  onAnnualChange={(value) => updatePension('annualBenefit', value)}
+                  frequency={assets.pension.inputFrequency ?? 'monthly'}
+                  onFrequencyChange={(f) => updatePension('inputFrequency', f)}
+                  hint="Before taxes"
+                />
+                <Input
+                  label="Start Age"
+                  type="number"
+                  value={assets.pension.startAge}
+                  onChange={(e) => updatePension('startAge', parseInt(e.target.value) || 65)}
+                  min={50}
+                  max={100}
+                  hint="When payments begin"
+                />
 
                 <PercentInput
                   label="Annual COLA"

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Asset, AccountType, AccountOwner } from '../../types';
-import { Input, CurrencyInput, Toggle, Select, Button } from '../ui';
+import type { Asset, AccountType, AccountOwner, InputFrequency } from '../../types';
+import { Input, CurrencyInput, CurrencyInputWithFrequency, Toggle, Select, Button } from '../ui';
 import { generateId } from '../../utils/migration';
 import { ACCOUNT_TYPE_LABELS } from '../../constants/defaults';
 
@@ -31,6 +31,7 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
   const [is401k, setIs401k] = useState(asset?.is401k ?? false);
   const [separatedFromService, setSeparatedFromService] = useState(asset?.separatedFromService ?? false);
   const [annualContribution, setAnnualContribution] = useState(asset?.annualContribution ?? 0);
+  const [contributionFrequency, setContributionFrequency] = useState<InputFrequency>(asset?.inputFrequency ?? 'monthly');
   const [contributionStartYear, setContributionStartYear] = useState(asset?.contributionStartYear ?? new Date().getFullYear());
   const [contributionEndYear, setContributionEndYear] = useState(asset?.contributionEndYear ?? new Date().getFullYear() + 20);
 
@@ -76,6 +77,7 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
 
     if (annualContribution > 0) {
       newAsset.annualContribution = annualContribution;
+      newAsset.inputFrequency = contributionFrequency;
       newAsset.contributionStartYear = contributionStartYear;
       newAsset.contributionEndYear = contributionEndYear;
     }
@@ -204,10 +206,12 @@ export function AssetEditForm({ asset, isMarried, onSave, onDelete, onCancel }: 
 
           {/* Contributions */}
           <div className="pt-3 border-t border-zinc-800 space-y-3">
-            <CurrencyInput
-              label="Annual Contribution"
-              value={annualContribution}
-              onChange={setAnnualContribution}
+            <CurrencyInputWithFrequency
+              label="Contribution"
+              annualValue={annualContribution}
+              onAnnualChange={setAnnualContribution}
+              frequency={contributionFrequency}
+              onFrequencyChange={setContributionFrequency}
               hint="Amount added each year (e.g. 401k, IRA)"
             />
 

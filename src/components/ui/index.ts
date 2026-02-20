@@ -9,3 +9,5 @@ export { Card } from './Card';
 export { Tooltip } from './Tooltip';
 export { FIStatusIndicator } from './FIStatusIndicator';
 export { LoadingScreen } from './LoadingScreen';
+export { FrequencyToggle } from './FrequencyToggle';
+export { CurrencyInputWithFrequency } from './CurrencyInputWithFrequency';

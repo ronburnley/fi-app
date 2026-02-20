@@ -13,6 +13,8 @@ import type {
   Income,
   EmploymentIncome,
   Assumptions,
+  AppState,
+  InputFrequency,
 } from '../types';
 
 // Legacy employment format (had contribution fields and endAge)
@@ -462,6 +464,133 @@ export function migrateSurplusAccount(
   return {
     ...rest,
     accumulationSurplusAccountId: largest.id,
+  };
+}
+
+// Check if data needs inputFrequency migration (existing data without frequency fields)
+export function needsFrequencyMigration(data: Partial<AppState>): boolean {
+  // Check employment income
+  if (data.income?.employment && !('inputFrequency' in data.income.employment)) return true;
+  if (data.income?.spouseEmployment && !('inputFrequency' in data.income.spouseEmployment)) return true;
+
+  // Check retirement incomes
+  if (data.income?.retirementIncomes) {
+    for (const ri of data.income.retirementIncomes) {
+      if (!('inputFrequency' in ri)) return true;
+    }
+  }
+
+  // Check pension
+  if (data.assets?.pension && !('inputFrequency' in data.assets.pension)) return true;
+
+  // Check expenses
+  if (data.expenses?.categories) {
+    for (const expense of data.expenses.categories) {
+      if (!('inputFrequency' in expense)) return true;
+    }
+  }
+
+  // Check home expense frequencies
+  if (data.expenses?.home) {
+    if (!('propertyTaxFrequency' in data.expenses.home)) return true;
+    if (!('insuranceFrequency' in data.expenses.home)) return true;
+  }
+
+  // Check asset contributions
+  if (data.assets?.accounts) {
+    for (const account of data.assets.accounts) {
+      if (account.annualContribution && !('inputFrequency' in account)) return true;
+    }
+  }
+
+  return false;
+}
+
+// Stamp inputFrequency: 'annual' on all existing items that lack it
+export function migrateInputFrequency(data: {
+  income?: Income;
+  assets?: Assets;
+  expenses?: Expenses;
+}): {
+  income?: Income;
+  assets?: Assets;
+  expenses?: Expenses;
+} {
+  const annual: InputFrequency = 'annual';
+
+  // Migrate employment income
+  let migratedIncome = data.income;
+  if (migratedIncome) {
+    let updatedEmployment = migratedIncome.employment;
+    if (updatedEmployment && !updatedEmployment.inputFrequency) {
+      updatedEmployment = { ...updatedEmployment, inputFrequency: annual };
+    }
+
+    let updatedSpouseEmployment = migratedIncome.spouseEmployment;
+    if (updatedSpouseEmployment && !updatedSpouseEmployment.inputFrequency) {
+      updatedSpouseEmployment = { ...updatedSpouseEmployment, inputFrequency: annual };
+    }
+
+    const updatedRetirementIncomes = migratedIncome.retirementIncomes?.map((ri) =>
+      ri.inputFrequency ? ri : { ...ri, inputFrequency: annual }
+    );
+
+    migratedIncome = {
+      ...migratedIncome,
+      employment: updatedEmployment,
+      spouseEmployment: updatedSpouseEmployment,
+      retirementIncomes: updatedRetirementIncomes ?? [],
+    };
+  }
+
+  // Migrate assets (pension + account contributions)
+  let migratedAssets = data.assets;
+  if (migratedAssets) {
+    let updatedPension = migratedAssets.pension;
+    if (updatedPension && !updatedPension.inputFrequency) {
+      updatedPension = { ...updatedPension, inputFrequency: annual };
+    }
+
+    const updatedAccounts = migratedAssets.accounts?.map((account) =>
+      account.annualContribution && !account.inputFrequency
+        ? { ...account, inputFrequency: annual }
+        : account
+    );
+
+    migratedAssets = {
+      ...migratedAssets,
+      pension: updatedPension,
+      accounts: updatedAccounts ?? [],
+    };
+  }
+
+  // Migrate expenses
+  let migratedExpenses = data.expenses;
+  if (migratedExpenses) {
+    const updatedCategories = migratedExpenses.categories?.map((expense) =>
+      expense.inputFrequency ? expense : { ...expense, inputFrequency: annual }
+    );
+
+    let updatedHome = migratedExpenses.home;
+    if (updatedHome) {
+      updatedHome = {
+        ...updatedHome,
+        propertyTaxFrequency: updatedHome.propertyTaxFrequency ?? annual,
+        insuranceFrequency: updatedHome.insuranceFrequency ?? annual,
+      };
+    }
+
+    migratedExpenses = {
+      ...migratedExpenses,
+      categories: updatedCategories ?? [],
+      home: updatedHome,
+    };
+  }
+
+  return {
+    income: migratedIncome,
+    assets: migratedAssets,
+    expenses: migratedExpenses,
   };
 }
 
