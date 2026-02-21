@@ -85,7 +85,14 @@ function calculateBaseSpending(state: AppState): number {
   }
   if (state.expenses.home) {
     if (state.expenses.home.mortgage) {
-      baseSpending += state.expenses.home.mortgage.monthlyPayment * 12;
+      const mortgage = state.expenses.home.mortgage;
+      const mortgageEndYear = mortgage.originationYear + mortgage.loanTermYears;
+      const isNotPaidOff = mortgage.earlyPayoff?.enabled
+        ? currentYear < mortgage.earlyPayoff.payoffYear
+        : currentYear <= mortgageEndYear;
+      if (isNotPaidOff) {
+        baseSpending += mortgage.monthlyPayment * 12;
+      }
     }
     baseSpending += state.expenses.home.propertyTax + state.expenses.home.insurance;
   }

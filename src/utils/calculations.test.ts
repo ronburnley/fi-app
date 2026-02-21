@@ -1280,6 +1280,53 @@ describe('Achievable FI Age', () => {
     expect(result.shortfallGuidance!.runsOutAtAge).toBeLessThan(95);
   });
 
+  it('shortfall guidance excludes mortgage payment when already paid off', () => {
+    const currentYear = new Date().getFullYear();
+
+    // Scenario: mortgage was paid off early 2 years ago, but shortfall guidance
+    // was incorrectly including it in base spending
+    const state = createTestState({
+      profile: { currentAge: 80, targetFIAge: 80, lifeExpectancy: 95, state: 'TX', filingStatus: 'single' },
+      assets: {
+        accounts: [
+          { id: 'cash-1', name: 'Cash', type: 'cash', owner: 'self', balance: 10000 },
+        ],
+      },
+      socialSecurity: { include: false, monthlyBenefit: 0, startAge: 67, colaRate: 0 },
+      expenses: {
+        categories: [{ id: 'exp-1', name: 'Living', annualAmount: 60000, category: 'living' }],
+        home: {
+          propertyTax: 5000,
+          insurance: 2000,
+          mortgage: {
+            homeValue: 400000,
+            monthlyPayment: 2000,
+            manualPaymentOverride: false,
+            loanBalance: 0,
+            interestRate: 0.04,
+            originationYear: currentYear - 25,
+            loanTermYears: 30,
+            earlyPayoff: {
+              enabled: true,
+              payoffYear: currentYear - 2,
+            },
+          },
+        },
+      },
+    });
+
+    const result = calculateAchievableFIAge(state);
+
+    expect(result.confidenceLevel).toBe('not_achievable');
+    expect(result.shortfallGuidance).toBeDefined();
+    // The key assertion: spending reduction should be based on
+    // $60,000 + $5,000 + $2,000 = $67,000 (no mortgage payment)
+    // NOT $67,000 + $24,000 = $91,000 (with mortgage incorrectly included)
+    if (result.shortfallGuidance!.spendingReductionNeeded > 0) {
+      expect(result.shortfallGuidance!.spendingReductionNeeded).toBeLessThan(67000);
+    }
+  });
+
   it('employment income makes FI achievable earlier', () => {
     // Without employment: need FI later
     const stateNoEmployment = createTestState({
