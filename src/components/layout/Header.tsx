@@ -5,11 +5,12 @@ import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { useWizard } from '../wizard/WizardContext';
 import { useProjectionContext } from '../../context/ProjectionContext';
+import { hasMinimumDataForResults } from '../../utils/dataReadiness';
 
 export function Header() {
   const { state, syncStatus } = useApp();
   const { user, signOut, isGuest } = useAuth();
-  const { currentStep } = useWizard();
+  const { currentStep, goToResults } = useWizard();
   const { achievableFI } = useProjectionContext();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -18,6 +19,7 @@ export function Header() {
 
   // Show indicator after step 1 (once user has entered assets in step 2+)
   const showIndicator = currentStep >= 2;
+  const isIndicatorClickable = showIndicator && hasMinimumDataForResults(state) && currentStep !== 8;
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -98,7 +100,12 @@ export function Header() {
 
       {/* Center: FI Status Indicator */}
       <div className="header-center">
-        <FIStatusIndicator result={achievableFI} isVisible={showIndicator} />
+        <FIStatusIndicator
+          result={achievableFI}
+          isVisible={showIndicator}
+          isClickable={isIndicatorClickable}
+          onClick={goToResults}
+        />
       </div>
 
       {/* Right: Sync Status + User Menu (or Sign In for guests) */}

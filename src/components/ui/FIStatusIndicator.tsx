@@ -10,6 +10,8 @@ type FIStatus =
 interface FIStatusIndicatorProps {
   result: AchievableFIResult | null;
   isVisible: boolean;
+  isClickable?: boolean;
+  onClick?: () => void;
 }
 
 function resultToStatus(result: AchievableFIResult | null, isVisible: boolean): FIStatus {
@@ -39,15 +41,15 @@ function resultToStatus(result: AchievableFIResult | null, isVisible: boolean): 
   return { state: 'hidden' };
 }
 
-export function FIStatusIndicator({ result, isVisible }: FIStatusIndicatorProps) {
+export function FIStatusIndicator({ result, isVisible, isClickable = false, onClick }: FIStatusIndicatorProps) {
   const status = resultToStatus(result, isVisible);
 
   if (status.state === 'hidden') {
     return null;
   }
 
-  return (
-    <div className="fi-status-container">
+  const indicatorContent = (
+    <>
       {/* Outer glow ring */}
       <div className={`fi-status-glow ${status.state}`} />
 
@@ -103,6 +105,47 @@ export function FIStatusIndicator({ result, isVisible }: FIStatusIndicatorProps)
 
       {/* Scan line effect */}
       <div className="fi-status-scanline" />
+
+      {/* Action strip — always visible when clickable */}
+      {isClickable && (
+        <div className="fi-status-action">
+          <span className="fi-status-action-text">View full results</span>
+          <svg
+            className="fi-status-action-arrow"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+          >
+            <path
+              d="M2.5 6H9.5M9.5 6L6.5 3M9.5 6L6.5 9"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      )}
+    </>
+  );
+
+  if (isClickable) {
+    return (
+      <button
+        className="fi-status-container fi-status-clickable"
+        onClick={onClick}
+        aria-label="View full results"
+        type="button"
+      >
+        {indicatorContent}
+      </button>
+    );
+  }
+
+  return (
+    <div className="fi-status-container">
+      {indicatorContent}
     </div>
   );
 }

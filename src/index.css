@@ -395,6 +395,107 @@ input[type="number"] {
 }
 
 /* ================================================
+   FI STATUS INDICATOR — CLICKABLE STATE
+   Makes the indicator an obvious portal to Results
+   ================================================ */
+
+/* Button reset when clickable */
+button.fi-status-clickable {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Action strip — the primary "this is clickable" affordance */
+.fi-status-action {
+  position: absolute;
+  bottom: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fi-status-action-text {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  color: #a1a1aa;
+  transition: color 0.2s ease;
+}
+
+.fi-status-action-arrow {
+  color: #52525b;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* Hover: whole indicator */
+.fi-status-clickable:hover .fi-status-body {
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 24px rgba(34, 197, 94, 0.12);
+}
+
+.fi-status-clickable:hover .fi-status-body.unreachable {
+  border-color: rgba(234, 179, 8, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.5),
+    0 0 24px rgba(234, 179, 8, 0.12);
+}
+
+.fi-status-clickable:hover .fi-status-glow {
+  opacity: 0.9;
+  filter: blur(10px);
+}
+
+.fi-status-clickable:hover .fi-status-action-text {
+  color: #fafafa;
+}
+
+.fi-status-clickable:hover .fi-status-action-arrow {
+  color: #22c55e;
+  transform: translateX(2px);
+}
+
+/* Active/press state */
+.fi-status-clickable:active .fi-status-body {
+  transform: scale(0.97);
+  transition-duration: 0.1s;
+}
+
+/* Focus visible (keyboard nav) */
+.fi-status-clickable:focus-visible .fi-status-body {
+  outline: 2px solid #3b82f6;
+  outline-offset: 3px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .fi-status-action-text {
+    font-size: 10px;
+  }
+}
+
+/* ================================================
    HEADER LAYOUT WITH FI INDICATOR
    ================================================ */
 

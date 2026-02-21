@@ -260,6 +260,7 @@ export interface WhatIfAdjustments {
 export interface WizardState {
   currentStep: number;
   maxVisitedStep: number;
+  returnStep: number | null;
 }
 
 export interface ShortfallGuidance {

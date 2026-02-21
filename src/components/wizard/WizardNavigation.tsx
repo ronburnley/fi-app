@@ -7,7 +7,7 @@ interface WizardNavigationProps {
 }
 
 export function WizardNavigation({ onValidate, disabled = false }: WizardNavigationProps) {
-  const { currentStep, nextStep, prevStep, canGoBack, isLastStep } = useWizard();
+  const { currentStep, nextStep, prevStep, goToStep, canGoBack, isLastStep, returnStep, clearReturnStep } = useWizard();
 
   const handleNext = () => {
     if (onValidate && !onValidate()) {
@@ -16,10 +16,19 @@ export function WizardNavigation({ onValidate, disabled = false }: WizardNavigat
     nextStep();
   };
 
+  const handleBack = () => {
+    if (isLastStep && returnStep !== null) {
+      goToStep(returnStep);
+      clearReturnStep();
+    } else {
+      prevStep();
+    }
+  };
+
   if (isLastStep) {
     return (
       <div className="flex justify-start pt-6">
-        <Button variant="secondary" onClick={prevStep}>
+        <Button variant="secondary" onClick={handleBack}>
           Back
         </Button>
       </div>

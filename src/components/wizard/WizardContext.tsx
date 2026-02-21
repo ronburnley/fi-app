@@ -9,6 +9,9 @@ interface WizardContextType {
   goToStep: (step: number) => void;
   nextStep: () => void;
   prevStep: () => void;
+  goToResults: () => void;
+  clearReturnStep: () => void;
+  returnStep: number | null;
   canGoBack: boolean;
   canGoForward: boolean;
   isLastStep: boolean;
@@ -26,6 +29,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const [wizardState, setWizardState] = useState<WizardState>({
     currentStep: 1,
     maxVisitedStep: 1,
+    returnStep: null,
   });
 
   const goToStep = useCallback((step: number) => {
@@ -44,6 +48,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
       return {
         currentStep: nextStepNum,
         maxVisitedStep: Math.max(prev.maxVisitedStep, nextStepNum),
+        returnStep: null,
       };
     });
   }, []);
@@ -55,6 +60,21 @@ export function WizardProvider({ children }: WizardProviderProps) {
     }));
   }, []);
 
+  const goToResults = useCallback(() => {
+    setWizardState((prev) => ({
+      currentStep: TOTAL_STEPS,
+      maxVisitedStep: Math.max(prev.maxVisitedStep, TOTAL_STEPS),
+      returnStep: prev.currentStep,
+    }));
+  }, []);
+
+  const clearReturnStep = useCallback(() => {
+    setWizardState((prev) => ({
+      ...prev,
+      returnStep: null,
+    }));
+  }, []);
+
   const value: WizardContextType = {
     wizardState,
     currentStep: wizardState.currentStep,
@@ -62,6 +82,9 @@ export function WizardProvider({ children }: WizardProviderProps) {
     goToStep,
     nextStep,
     prevStep,
+    goToResults,
+    clearReturnStep,
+    returnStep: wizardState.returnStep,
     canGoBack: wizardState.currentStep > 1,
     canGoForward: wizardState.currentStep < wizardState.maxVisitedStep,
     isLastStep: wizardState.currentStep === TOTAL_STEPS,
